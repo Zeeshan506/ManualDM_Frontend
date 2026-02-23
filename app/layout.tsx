@@ -25,7 +25,7 @@ export default function RootLayout({
           <AppSidebar />
 
           <main className="relative flex-1 flex flex-col h-full bg-gray-50 overflow-hidden">
-            <SidebarTrigger className="top-4 left-3 sm:top-4 sm:left-4 z-50" />
+            <SidebarTrigger className="absolute top-4 right-4 sm:top-4 sm:right-4 z-50" />
             {children}
           </main>
         </SidebarProvider>

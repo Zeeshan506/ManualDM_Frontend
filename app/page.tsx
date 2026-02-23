@@ -27,7 +27,7 @@ export default function Dashboard() {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 sm:gap-0 mb-6 sm:mb-8">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
-            Welcome back, سید ذیشان اظہر
+            Welcome back, User!
           </h1>
           <p className="text-xs sm:text-sm text-gray-500 mt-1 overflow-hidden text-ellipsis">
             {currentDate} • Phone: 03355933938
