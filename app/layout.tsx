@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/components/app-sidebar";
+import { AppShell } from "@/components/layout/AppShell";
+import { AuthProvider } from "@/contexts/AuthContext";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -18,17 +18,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${inter.className} bg-gray-50 text-gray-900 h-screen overflow-hidden flex flex-col sm:flex-row`}
-      >
-        <SidebarProvider>
-          <AppSidebar />
-
-          <main className="relative flex-1 flex flex-col h-full bg-gray-50 overflow-hidden">
-            <SidebarTrigger className="absolute top-4 right-4 sm:top-4 sm:right-4 z-50" />
-            {children}
-          </main>
-        </SidebarProvider>
+      <body className={`${inter.className} bg-gray-50 text-gray-900`}>
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
 
         {/* ================= GLOBAL TOASTER ================= */}
         {/* Placed here so it can render over any page content */}
