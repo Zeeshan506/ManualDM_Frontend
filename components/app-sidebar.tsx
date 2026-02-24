@@ -3,11 +3,12 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import {
+  Activity,
   BotMessageSquare,
+  Inbox,
   LayoutDashboard,
   LogOut,
   MessageSquare,
-  Users,
 } from "lucide-react"
 import {
   Sidebar,
@@ -39,6 +40,19 @@ export function AppSidebar() {
     router.refresh()
   }
 
+  const adminNavItems = [
+    { href: "/admin", label: "Dashboard", tooltip: "Dashboard", icon: LayoutDashboard },
+    { href: "/admin", label: "Team Activity", tooltip: "Team Activity", icon: Activity },
+    { href: "/leads", label: "All Chats", tooltip: "All Chats", icon: MessageSquare },
+  ]
+
+  const salesNavItems = [
+    { href: "/leads", label: "Unassigned Pool", tooltip: "Unassigned Pool", icon: Inbox },
+    { href: "/leads/active", label: "My Chats", tooltip: "My Chats", icon: MessageSquare },
+  ]
+
+  const navItems = user?.role === "admin" ? adminNavItems : salesNavItems
+
   return (
     <Sidebar collapsible="icon" className="[&_[data-sidebar=sidebar]]:bg-gray-900 [&_[data-sidebar=sidebar]]:text-gray-300">
       <SidebarHeader className="h-16 border-b border-gray-800 px-6 group-data-[collapsible=icon]:px-2">
@@ -52,44 +66,23 @@ export function AppSidebar() {
 
       <SidebarContent className="p-4 group-data-[collapsible=icon]:p-2">
         <SidebarMenu className="space-y-1">
-          <SidebarMenuItem>
-            <SidebarMenuButton 
-              asChild 
-              tooltip="Dashboard"
-              className="h-auto rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-gray-800 hover:text-white data-[active=true]:bg-gray-800 data-[active=true]:text-white"
-            >
-              <Link href="/">
-                <LayoutDashboard className="w-5 h-5" />
-                <span>Dashboard</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-
-          <SidebarMenuItem>
-            <SidebarMenuButton 
-              asChild 
-              tooltip="All Leads"
-              className="h-auto rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-gray-800 hover:text-white data-[active=true]:bg-gray-800 data-[active=true]:text-white"
-            >
-              <Link href="/leads">
-                <Users className="w-5 h-5" />
-                <span>All Leads</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-
-          <SidebarMenuItem>
-            <SidebarMenuButton 
-              asChild 
-              tooltip="Active Chats"
-              className="h-auto rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-gray-800 hover:text-white data-[active=true]:bg-gray-800 data-[active=true]:text-white"
-            >
-              <Link href="/leads/active">
-                <MessageSquare className="w-5 h-5" />
-                <span>Active Chats</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          {navItems.map((item) => {
+            const Icon = item.icon
+            return (
+              <SidebarMenuItem key={item.label}>
+                <SidebarMenuButton
+                  asChild
+                  tooltip={item.tooltip}
+                  className="h-auto rounded-lg px-3 py-2.5 text-sm font-medium hover:bg-gray-800 hover:text-white data-[active=true]:bg-gray-800 data-[active=true]:text-white"
+                >
+                  <Link href={item.href}>
+                    <Icon className="w-5 h-5" />
+                    <span>{item.label}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )
+          })}
         </SidebarMenu>
       </SidebarContent>
 
