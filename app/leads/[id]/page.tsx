@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import {
-  LeadDetailsForm,
   Lead,
   LeadDetails,
 } from "./components/LeadDetailsForm";
@@ -18,20 +17,27 @@ import { RightDetailsPanel } from "./components/RightDetailsPanel";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+let leadsCache: Lead[] | null = null;
+let messagesByLeadCache: Record<number, MessageItem[]> | null = null;
+let leadDetailsByIdCache: Record<number, LeadDetails> = {};
+
 export default function ChatView() {
   const params = useParams();
-  const activeId = params.id as string;
-  
-  // Create a flag to verify we have an ID and it isn't the "active" slug
-  const isValidChatId = Boolean(activeId && activeId !== "active");
-  const activeIdNumber = Number(activeId); // Will safely become NaN if "active", which we handle below
+  const activeIdNumber = Number(params.id);
+  const isValidChatId = Number.isFinite(activeIdNumber) && activeIdNumber > 0;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [messagesByLead, setMessagesByLead] = useState<Record<number, MessageItem[]>>({});
-  const [leadDetailsById, setLeadDetailsById] = useState<Record<number, LeadDetails>>({});
+  const [isLoading, setIsLoading] = useState(
+    !(leadsCache && messagesByLeadCache)
+  );
+  const [leads, setLeads] = useState<Lead[]>(() => leadsCache ?? []);
+  const [messagesByLead, setMessagesByLead] = useState<Record<number, MessageItem[]>>(
+    () => messagesByLeadCache ?? {}
+  );
+  const [leadDetailsById, setLeadDetailsById] = useState<Record<number, LeadDetails>>(
+    () => leadDetailsByIdCache
+  );
 
   const activeChat = useMemo(
     () => leads.find((chat) => chat.id === activeIdNumber),
@@ -40,7 +46,7 @@ export default function ChatView() {
   
   const activeMessages = messagesByLead[activeIdNumber] || [];
   const activeLeadDetails = leadDetailsById[activeIdNumber] || {
-    id: activeIdNumber,
+    id: isValidChatId ? activeIdNumber : 0,
     igsid: activeChat?.igsid || null,
     name: activeChat?.name || "",
     status: activeChat?.status || "new",
@@ -65,29 +71,45 @@ export default function ChatView() {
   );
 
   const fetchLeadDetails = async (leadId: number) => {
+    if (leadDetailsByIdCache[leadId]) {
+      setLeadDetailsById((prev) => ({ ...prev, [leadId]: leadDetailsByIdCache[leadId] }));
+      return;
+    }
+
     try {
       const response = await fetch(`${API_URL}/api/leads/${leadId}`);
       if (!response.ok) return;
       const details = (await response.json()) as LeadDetails;
+      leadDetailsByIdCache = { ...leadDetailsByIdCache, [leadId]: details };
       setLeadDetailsById((prev) => ({ ...prev, [leadId]: details }));
-      setLeads((prev) =>
-        prev.map((lead) =>
+      setLeads((prev) => {
+        const nextLeads = prev.map((lead) =>
           lead.id === leadId
             ? {
                 ...lead,
+                name: details.name || "",
                 email: details.email || "",
                 phone: details.phone || "",
                 status: details.status,
               }
             : lead
-        )
-      );
+        );
+        leadsCache = nextLeads;
+        return nextLeads;
+      });
     } catch {
       // Silent fail; base lead data is already shown
     }
   };
 
   const fetchLeadsAndMessages = async () => {
+    if (leadsCache && messagesByLeadCache) {
+      setLeads(leadsCache);
+      setMessagesByLead(messagesByLeadCache);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const leadsRes = await fetch(`${API_URL}/api/leads`);
@@ -96,6 +118,7 @@ export default function ChatView() {
       }
 
       const leadsData = (await leadsRes.json()) as Lead[];
+  leadsCache = leadsData;
       setLeads(leadsData);
 
       const messageResults = await Promise.all(
@@ -115,7 +138,9 @@ export default function ChatView() {
         })
       );
 
-      setMessagesByLead(Object.fromEntries(messageResults));
+      const nextMessagesByLead = Object.fromEntries(messageResults);
+      messagesByLeadCache = nextMessagesByLead;
+      setMessagesByLead(nextMessagesByLead);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to load leads."
@@ -128,18 +153,17 @@ export default function ChatView() {
   // Clear reply input on chat change
   useEffect(() => {
     setReplyText("");
-  }, [activeId]);
+  }, [activeIdNumber]);
 
   useEffect(() => {
     fetchLeadsAndMessages();
   }, []);
 
   useEffect(() => {
-    // Number.isFinite catches NaN (which activeIdNumber will be if activeId is "active")
-    if (Number.isFinite(activeIdNumber) && activeIdNumber > 0) {
+    if (isValidChatId) {
       fetchLeadDetails(activeIdNumber);
     }
-  }, [activeIdNumber]);
+  }, [activeIdNumber, isValidChatId]);
 
   return (
     <div className="flex h-full w-full bg-white overflow-hidden relative">
@@ -178,22 +202,29 @@ export default function ChatView() {
         activeChat={activeChat}
         leadDetails={activeLeadDetails}
         onLeadUpdated={(updatedLead) => {
+          leadDetailsByIdCache = {
+            ...leadDetailsByIdCache,
+            [updatedLead.id]: updatedLead,
+          };
           setLeadDetailsById((prev) => ({
             ...prev,
             [updatedLead.id]: updatedLead,
           }));
-          setLeads((prev) =>
-            prev.map((lead) =>
+          setLeads((prev) => {
+            const nextLeads = prev.map((lead) =>
               lead.id === updatedLead.id
                 ? {
                     ...lead,
+                    name: updatedLead.name,
                     status: updatedLead.status,
                     email: updatedLead.email,
                     phone: updatedLead.phone,
                   }
                 : lead
-            )
-          );
+            );
+            leadsCache = nextLeads;
+            return nextLeads;
+          });
         }}
       />
 
@@ -204,22 +235,29 @@ export default function ChatView() {
         leadDetails={activeLeadDetails}
         onClose={() => setIsModalOpen(false)}
         onLeadUpdated={(updatedLead) => {
+          leadDetailsByIdCache = {
+            ...leadDetailsByIdCache,
+            [updatedLead.id]: updatedLead,
+          };
           setLeadDetailsById((prev) => ({
             ...prev,
             [updatedLead.id]: updatedLead,
           }));
-          setLeads((prev) =>
-            prev.map((lead) =>
+          setLeads((prev) => {
+            const nextLeads = prev.map((lead) =>
               lead.id === updatedLead.id
                 ? {
                     ...lead,
+                    name: updatedLead.name,
                     status: updatedLead.status,
                     email: updatedLead.email,
                     phone: updatedLead.phone,
                   }
                 : lead
-            )
-          );
+            );
+            leadsCache = nextLeads;
+            return nextLeads;
+          });
         }}
       />
     </div>

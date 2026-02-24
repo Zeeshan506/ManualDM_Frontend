@@ -2,7 +2,6 @@
 
 import React from "react";
 import { format } from "date-fns";
-import { Mail } from "lucide-react";
 
 export interface MessageItem {
   id: number;

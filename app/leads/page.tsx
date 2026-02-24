@@ -36,6 +36,7 @@ export default function LeadsDirectory() {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
+  const [nameInput, setNameInput] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [phoneInput, setPhoneInput] = useState("");
 
@@ -76,6 +77,7 @@ export default function LeadsDirectory() {
     e.preventDefault();
     e.stopPropagation();
     setActiveLead(lead);
+    setNameInput(lead.name || "");
     setEmailInput(lead.email || "");
     setPhoneInput(lead.phone || "");
     setIsModalOpen(true);
@@ -90,6 +92,7 @@ export default function LeadsDirectory() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
+          name: nameInput.trim() || null,
           email: emailInput || null, 
           phone: phoneInput || null 
         }),
@@ -263,6 +266,20 @@ export default function LeadsDirectory() {
             </div>
 
             <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 uppercase mb-1.5">Custom Name</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    placeholder="Enter a custom name"
+                    className="w-full pl-9 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all shadow-sm"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-semibold text-gray-600 uppercase mb-1.5">Email Address</label>
                 <div className="relative">
