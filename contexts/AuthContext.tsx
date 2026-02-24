@@ -1,12 +1,13 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 export type UserRole = "admin" | "sales_rep";
 
 type AuthUser = {
   userId: string;
   role: UserRole;
+  accessToken?: string;
 };
 
 type AuthContextValue = {
@@ -47,7 +48,7 @@ function clearCookie(name: string) {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const cookieUser = useMemo<AuthUser | null>(() => {
+  const readUserFromCookies = useCallback((): AuthUser | null => {
     const token = getCookie(AUTH_TOKEN_COOKIE);
     const userId = getCookie(USER_ID_COOKIE);
     const roleValue = getCookie(USER_ROLE_COOKIE);
@@ -61,8 +62,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return null;
   }, []);
 
+  useEffect(() => {
+    setUser(readUserFromCookies());
+  }, [readUserFromCookies]);
+
   const login = useCallback((nextUser: AuthUser) => {
-    setCookie(AUTH_TOKEN_COOKIE, `${nextUser.userId}-${Date.now()}`, COOKIE_MAX_AGE);
+    const tokenValue = nextUser.accessToken?.trim() || `${nextUser.userId}-${Date.now()}`;
+    setCookie(AUTH_TOKEN_COOKIE, tokenValue, COOKIE_MAX_AGE);
     setCookie(USER_ID_COOKIE, nextUser.userId, COOKIE_MAX_AGE);
     setCookie(USER_ROLE_COOKIE, nextUser.role, COOKIE_MAX_AGE);
     setUser(nextUser);
@@ -77,12 +83,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      user: user ?? cookieUser,
-      isAuthenticated: !!(user ?? cookieUser),
+      user,
+      isAuthenticated: !!user,
       login,
       logout,
     }),
-    [user, cookieUser, login, logout]
+    [user, login, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

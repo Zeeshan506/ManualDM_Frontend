@@ -7,18 +7,33 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth, type UserRole } from "@/contexts/AuthContext";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+type LoginApiSuccess = {
+  access_token: string;
+  token_type: string;
+  user_id: number;
+  username: string;
+  role: UserRole;
+};
+
+type LoginApiError = {
+  detail?: string;
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<UserRole>("admin");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showAssistanceModal, setShowAssistanceModal] = useState(false);
   const [assistanceRequested, setAssistanceRequested] = useState(false);
 
-  const canSubmit = useMemo(() => email.trim() !== "" && password.trim() !== "", [email, password]);
+  const canSubmit = useMemo(() => username.trim() !== "" && password.trim() !== "", [username, password]);
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -27,17 +42,57 @@ export default function LoginPage() {
       return;
     }
 
+    setErrorMessage(null);
     setIsSubmitting(true);
 
-    const localIdPart = email.split("@")[0]?.trim() || "user";
+    const normalizedUsername = username.trim();
+    const normalizedPassword = password;
 
-    login({
-      userId: localIdPart,
-      role,
-    });
+    try {
+      const response = await fetch(`${API_URL}/api/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: normalizedUsername,
+          password: normalizedPassword,
+        }),
+      });
 
-    router.push("/");
-    router.refresh();
+      if (!response.ok) {
+        let apiError: LoginApiError | null = null;
+        try {
+          apiError = (await response.json()) as LoginApiError;
+        } catch {
+          apiError = null;
+        }
+
+        setErrorMessage(apiError?.detail || "Unable to sign in. Please try again.");
+        return;
+      }
+
+      const data = (await response.json()) as LoginApiSuccess;
+
+      if (data.role !== role) {
+        setErrorMessage(`Account role is ${data.role === "admin" ? "Admin" : "Sales Rep"}. Please select the correct role and try again.`);
+        return;
+      }
+
+      login({
+        userId: data.username,
+        role: data.role,
+        accessToken: data.access_token,
+      });
+
+      router.push("/");
+      router.refresh();
+    } catch (error) {
+      console.error(error);
+      setErrorMessage("Unable to reach the server. Please check your connection and try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -48,15 +103,15 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="mt-6 space-y-4">
           <div className="space-y-2">
-            <label htmlFor="email" className="text-sm font-medium text-gray-700">
-              Email
+            <label htmlFor="username" className="text-sm font-medium text-gray-700">
+              Username
             </label>
             <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@company.com"
+              id="username"
+              type="text"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              placeholder="Enter your username"
               required
             />
           </div>
@@ -102,6 +157,12 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
+
+          {errorMessage && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {errorMessage}
+            </div>
+          )}
 
           <div className="pt-1 text-sm">
             {role === "admin" ? (
