@@ -20,7 +20,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <AppSidebar />
 
         <main className="relative flex-1 flex flex-col h-full bg-gray-50 overflow-y-auto">
-          <SidebarTrigger className="absolute top-4 right-4 sm:top-4 sm:right-4 z-50" />
+          <SidebarTrigger className="absolute top-2 right-2 sm:top-4 sm:right-4 z-50" />
           {children}
         </main>
       </SidebarProvider>

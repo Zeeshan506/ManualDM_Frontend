@@ -74,8 +74,13 @@ export default function LoginPage() {
 
       const data = (await response.json()) as LoginApiSuccess;
 
-      if (data.role !== role) {
-        setErrorMessage(`Account role is ${data.role === "admin" ? "Admin" : "Sales Rep"}. Please select the correct role and try again.`);
+      const isAdminSelection = role === "admin";
+      const isAdminLikeAccount = data.role === "admin" || data.role === "sudo_admin";
+      const roleSelectionMatches = isAdminSelection ? isAdminLikeAccount : data.role === role;
+
+      if (!roleSelectionMatches) {
+        const accountRoleLabel = isAdminLikeAccount ? "Admin" : "Sales Rep";
+        setErrorMessage(`Account role is ${accountRoleLabel}. Please select the correct role and try again.`);
         return;
       }
 
@@ -85,7 +90,8 @@ export default function LoginPage() {
         accessToken: data.access_token,
       });
 
-      router.push("/");
+      const nextPath = data.role === "sudo_admin" ? "/admin/users" : data.role === "admin" ? "/admin" : "/dashboard";
+      router.push(nextPath);
       router.refresh();
     } catch (error) {
       console.error(error);

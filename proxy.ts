@@ -12,23 +12,19 @@ export function proxy(request: NextRequest) {
   const isLoginRoute = pathname === "/login";
   const isAdminRoute = pathname.startsWith("/admin");
 
-  if (!token) {
-    if (isLoginRoute) {
-      return NextResponse.next();
-    }
+  if (isLoginRoute) {
+    return NextResponse.next();
+  }
 
+  if (!token) {
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
   }
 
-  const isKnownRole = role === "admin" || role === "sales_rep";
+  const isKnownRole = role === "admin" || role === "sales_rep" || role === "sudo_admin";
   if (!isKnownRole) {
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
-  }
-
-  if (isLoginRoute) {
-    return NextResponse.redirect(new URL("/", request.url));
   }
 
   if (isAdminRoute && role === "sales_rep") {

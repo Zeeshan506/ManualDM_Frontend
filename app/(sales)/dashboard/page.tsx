@@ -64,7 +64,8 @@ export default function UnassignedPoolPage() {
   };
 
   useEffect(() => {
-    if (user?.role !== "sales_rep") {
+    const isAuthorized = user?.role === "sales_rep" || user?.role === "admin" || user?.role === "sudo_admin";
+    if (!isAuthorized) {
       setLeads([]);
       setLoading(false);
       return;
@@ -87,14 +88,14 @@ export default function UnassignedPoolPage() {
     );
   }
 
-  if (user?.role !== "sales_rep") {
+if (user?.role !== "sales_rep" && user?.role !== "admin" && user?.role !== "sudo_admin") {
     return (
       <div className="flex items-center justify-center min-h-screen px-4">
         <Card className="max-w-md w-full border-yellow-200 bg-yellow-50/30">
           <CardContent className="pt-6 text-center">
             <User className="mx-auto h-12 w-12 text-yellow-600 mb-4" />
             <h2 className="text-xl font-semibold text-yellow-900">Access Restricted</h2>
-            <p className="text-yellow-700 mt-2">The Unassigned Pool is reserved for Sales Representatives. Please contact your admin if this is an error.</p>
+            <p className="text-yellow-700 mt-2">You do not have permission to access the lead pool. Please contact your admin if this is an error.</p>
           </CardContent>
         </Card>
       </div>

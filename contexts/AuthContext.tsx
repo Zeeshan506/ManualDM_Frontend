@@ -1,8 +1,8 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
-export type UserRole = "admin" | "sales_rep";
+export type UserRole = "admin" | "sales_rep" | "sudo_admin";
 
 type AuthUser = {
   userId: string;
@@ -13,6 +13,7 @@ type AuthUser = {
 type AuthContextValue = {
   user: AuthUser | null;
   isAuthenticated: boolean;
+  isAuthLoading: boolean;
   login: (user: AuthUser) => void;
   logout: () => void;
 };
@@ -47,25 +48,21 @@ function clearCookie(name: string) {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const readUserFromCookies = useCallback((): AuthUser | null => {
+  const [user, setUser] = useState<AuthUser | null>(() => {
     const token = getCookie(AUTH_TOKEN_COOKIE);
     const userId = getCookie(USER_ID_COOKIE);
     const roleValue = getCookie(USER_ROLE_COOKIE);
 
-    if (token && userId && (roleValue === "admin" || roleValue === "sales_rep")) {
+    if (token && userId && (roleValue === "admin" || roleValue === "sales_rep" || roleValue === "sudo_admin")) {
       return {
         userId,
-        role: roleValue,
+        role: roleValue as UserRole,
         accessToken: token,
       };
     }
     return null;
-  }, []);
-
-  useEffect(() => {
-    setUser(readUserFromCookies());
-  }, [readUserFromCookies]);
+  });
+  const isAuthLoading = false;
 
   const login = useCallback((nextUser: AuthUser) => {
     const tokenValue = nextUser.accessToken?.trim() || `${nextUser.userId}-${Date.now()}`;
@@ -86,10 +83,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       user,
       isAuthenticated: !!user,
+      isAuthLoading,
       login,
       logout,
     }),
-    [user, login, logout]
+    [user, isAuthLoading, login, logout]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
