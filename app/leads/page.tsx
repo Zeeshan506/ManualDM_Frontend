@@ -14,6 +14,7 @@ import {
   X
 } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -28,6 +29,7 @@ interface Lead {
 }
 
 export default function LeadsDirectory() {
+  const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -44,7 +46,28 @@ export default function LeadsDirectory() {
   const fetchLeads = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_URL}/api/leads`);
+      let url = `${API_URL}/api/leads`;
+      const accessToken = user?.accessToken;
+      const currentUserId = Number(user?.userId);
+
+      if (!accessToken) {
+        setLeads([]);
+        return;
+      }
+
+      if (user?.role === "sales_rep") {
+        if (!Number.isFinite(currentUserId)) {
+          setLeads([]);
+          return;
+        }
+        url += `?assigned_to=${currentUserId}`;
+      }
+
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
       if (!res.ok) throw new Error("Failed to fetch leads");
       const data = await res.json();
       setLeads(data);
@@ -57,8 +80,14 @@ export default function LeadsDirectory() {
   };
 
   useEffect(() => {
+    if (!user) {
+      setLeads([]);
+      setIsLoading(false);
+      return;
+    }
+
     fetchLeads();
-  }, []);
+  }, [user?.role, user?.userId, user?.accessToken]);
 
   // Filtering Logic
   const filteredLeads = leads.filter((lead) => {

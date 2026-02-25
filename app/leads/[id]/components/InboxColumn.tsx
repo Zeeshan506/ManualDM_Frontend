@@ -1,9 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { Lead } from "./LeadDetailsForm";
+import { useAuth } from "@/contexts/AuthContext";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface InboxItem extends Lead {
   lastMessage: string;
@@ -12,17 +15,67 @@ interface InboxItem extends Lead {
 
 interface InboxColumnProps {
   isVisible: boolean;
-  isLoading: boolean;
-  inboxItems: InboxItem[];
   activeId: number;
 }
 
 export function InboxColumn({
   isVisible,
-  isLoading,
-  inboxItems,
   activeId,
 }: InboxColumnProps) {
+  const { user } = useAuth();
+
+  const [inboxItems, setInboxItems] = useState<InboxItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchLeads = async () => {
+      try {
+        setIsLoading(true);
+        let url = `${API_URL}/api/leads`;
+        const accessToken = user?.accessToken;
+        const currentUserId = Number(user?.userId);
+
+        if (!accessToken) {
+          setInboxItems([]);
+          return;
+        }
+
+        // If the user is a Sales Rep, append the query parameter to only fetch THEIR leads.
+        // If the user is an Admin, we leave the URL alone to fetch everything.
+        if (user?.role === "sales_rep") {
+          if (!Number.isFinite(currentUserId)) {
+            setInboxItems([]);
+            return;
+          }
+          url += `?assigned_to=${currentUserId}`;
+        }
+
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+        if (!response.ok) throw new Error("Failed to fetch leads");
+
+        const data = await response.json();
+        setInboxItems(data);
+      } catch (error) {
+        console.error("Error fetching leads:", error);
+        setInboxItems([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (!user) {
+      setInboxItems([]);
+      setIsLoading(false);
+      return;
+    }
+
+    fetchLeads();
+  }, [user?.role, user?.userId, user?.accessToken]);
+
   return (
     <div
       className={`w-full md:w-80 border-r border-gray-200 bg-white shrink-0 flex flex-col ${isVisible ? "flex" : "hidden md:flex"}`}

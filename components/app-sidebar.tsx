@@ -47,8 +47,8 @@ export function AppSidebar() {
   ]
 
   const salesNavItems = [
-    { href: "/leads", label: "Unassigned Pool", tooltip: "Unassigned Pool", icon: Inbox },
-    { href: "/leads/active", label: "My Chats", tooltip: "My Chats", icon: MessageSquare },
+    { href: "/dashboard", label: "Unassigned Pool", tooltip: "Unassigned Pool", icon: Inbox },
+    { href: "/leads", label: "My Chats", tooltip: "My Chats", icon: MessageSquare },
   ]
 
   const navItems = user?.role === "admin" ? adminNavItems : salesNavItems

@@ -80,7 +80,7 @@ export default function LoginPage() {
       }
 
       login({
-        userId: data.username,
+        userId: String(data.user_id),
         role: data.role,
         accessToken: data.access_token,
       });

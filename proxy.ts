@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 const AUTH_TOKEN_COOKIE = "crm_auth_token";
 const USER_ROLE_COOKIE = "crm_user_role";
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(AUTH_TOKEN_COOKIE)?.value;
   const role = request.cookies.get(USER_ROLE_COOKIE)?.value;

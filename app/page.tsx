@@ -56,7 +56,7 @@ export default function RoleRoutingHubPage() {
           return;
         }
 
-        router.replace(me.role === "admin" ? "/admin" : "/sales");
+        router.replace(me.role === "admin" ? "/admin" : "/dashboard");
       } catch (error) {
         console.error(error);
         if (!isCancelled) {

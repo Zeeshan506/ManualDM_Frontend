@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   Lead,
   LeadDetails,
@@ -18,10 +19,11 @@ import { RightDetailsPanel } from "./components/RightDetailsPanel";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 let leadsCache: Lead[] | null = null;
-let messagesByLeadCache: Record<number, MessageItem[]> | null = null;
+let messagesByLeadCache: Record<number, MessageItem[]> = {};
 let leadDetailsByIdCache: Record<number, LeadDetails> = {};
 
 export default function ChatView() {
+  const { user } = useAuth();
   const params = useParams();
   const activeIdNumber = Number(params.id);
   const isValidChatId = Number.isFinite(activeIdNumber) && activeIdNumber > 0;
@@ -29,11 +31,11 @@ export default function ChatView() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [isLoading, setIsLoading] = useState(
-    !(leadsCache && messagesByLeadCache)
+    !leadsCache
   );
   const [leads, setLeads] = useState<Lead[]>(() => leadsCache ?? []);
   const [messagesByLead, setMessagesByLead] = useState<Record<number, MessageItem[]>>(
-    () => messagesByLeadCache ?? {}
+    () => messagesByLeadCache
   );
   const [leadDetailsById, setLeadDetailsById] = useState<Record<number, LeadDetails>>(
     () => leadDetailsByIdCache
@@ -56,28 +58,23 @@ export default function ChatView() {
     createdAt: new Date().toISOString(),
   };
 
-  const inboxItems = useMemo(
-    () =>
-      leads.map((lead) => {
-        const leadMessages = messagesByLead[lead.id] || [];
-        const latestMessage = leadMessages[leadMessages.length - 1];
-        return {
-          ...lead,
-          lastMessage: latestMessage?.text || "No messages yet",
-          time: latestMessage?.time || "",
-        };
-      }),
-    [leads, messagesByLead]
-  );
-
   const fetchLeadDetails = async (leadId: number) => {
+    const accessToken = user?.accessToken;
+    if (!accessToken) {
+      return;
+    }
+
     if (leadDetailsByIdCache[leadId]) {
       setLeadDetailsById((prev) => ({ ...prev, [leadId]: leadDetailsByIdCache[leadId] }));
       return;
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/leads/${leadId}`);
+      const response = await fetch(`${API_URL}/api/leads/${leadId}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
       if (!response.ok) return;
       const details = (await response.json()) as LeadDetails;
       leadDetailsByIdCache = { ...leadDetailsByIdCache, [leadId]: details };
@@ -103,44 +100,45 @@ export default function ChatView() {
   };
 
   const fetchLeadsAndMessages = async () => {
-    if (leadsCache && messagesByLeadCache) {
+    if (leadsCache) {
       setLeads(leadsCache);
-      setMessagesByLead(messagesByLeadCache);
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
     try {
-      const leadsRes = await fetch(`${API_URL}/api/leads`);
+      let leadsUrl = `${API_URL}/api/leads`;
+      const accessToken = user?.accessToken;
+      const currentUserId = Number(user?.userId);
+
+      if (!accessToken) {
+        setLeads([]);
+        setMessagesByLead({});
+        return;
+      }
+
+      if (user?.role === "sales_rep") {
+        if (!Number.isFinite(currentUserId)) {
+          setLeads([]);
+          setMessagesByLead({});
+          return;
+        }
+        leadsUrl += `?assigned_to=${currentUserId}`;
+      }
+
+      const leadsRes = await fetch(leadsUrl, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
       if (!leadsRes.ok) {
         throw new Error("Failed to fetch leads.");
       }
 
       const leadsData = (await leadsRes.json()) as Lead[];
-  leadsCache = leadsData;
+      leadsCache = leadsData;
       setLeads(leadsData);
-
-      const messageResults = await Promise.all(
-        leadsData.map(async (lead) => {
-          try {
-            const messagesRes = await fetch(
-              `${API_URL}/api/leads/${lead.id}/messages`
-            );
-            if (!messagesRes.ok) {
-              return [lead.id, [] as MessageItem[]] as const;
-            }
-            const messagesData = (await messagesRes.json()) as MessageItem[];
-            return [lead.id, messagesData] as const;
-          } catch {
-            return [lead.id, [] as MessageItem[]] as const;
-          }
-        })
-      );
-
-      const nextMessagesByLead = Object.fromEntries(messageResults);
-      messagesByLeadCache = nextMessagesByLead;
-      setMessagesByLead(nextMessagesByLead);
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "Failed to load leads."
@@ -150,28 +148,67 @@ export default function ChatView() {
     }
   };
 
+  const fetchMessagesForLead = async (leadId: number) => {
+    const accessToken = user?.accessToken;
+    if (!accessToken || !Number.isFinite(leadId) || leadId <= 0) {
+      return;
+    }
+
+    if (messagesByLeadCache[leadId]) {
+      setMessagesByLead((prev) => ({ ...prev, [leadId]: messagesByLeadCache[leadId] }));
+      return;
+    }
+
+    try {
+      const messagesRes = await fetch(`${API_URL}/api/leads/${leadId}/messages`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!messagesRes.ok) {
+        setMessagesByLead((prev) => ({ ...prev, [leadId]: [] }));
+        messagesByLeadCache = { ...messagesByLeadCache, [leadId]: [] };
+        return;
+      }
+
+      const messagesData = (await messagesRes.json()) as MessageItem[];
+      messagesByLeadCache = { ...messagesByLeadCache, [leadId]: messagesData };
+      setMessagesByLead((prev) => ({ ...prev, [leadId]: messagesData }));
+    } catch {
+      setMessagesByLead((prev) => ({ ...prev, [leadId]: [] }));
+      messagesByLeadCache = { ...messagesByLeadCache, [leadId]: [] };
+    }
+  };
+
   // Clear reply input on chat change
   useEffect(() => {
     setReplyText("");
   }, [activeIdNumber]);
 
   useEffect(() => {
+    if (!user) {
+      setIsLoading(false);
+      setLeads([]);
+      setMessagesByLead({});
+      return;
+    }
+
     fetchLeadsAndMessages();
-  }, []);
+  }, [user?.role, user?.userId, user?.accessToken]);
 
   useEffect(() => {
     if (isValidChatId) {
+      fetchMessagesForLead(activeIdNumber);
       fetchLeadDetails(activeIdNumber);
     }
-  }, [activeIdNumber, isValidChatId]);
+  }, [activeIdNumber, isValidChatId, user?.accessToken]);
 
   return (
     <div className="flex h-full w-full bg-white overflow-hidden relative">
       {/* ================= LEFT COLUMN: INBOX ================= */}
       <InboxColumn
         isVisible={!isValidChatId}
-        isLoading={isLoading}
-        inboxItems={inboxItems}
         activeId={activeIdNumber}
       />
 

@@ -57,6 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return {
         userId,
         role: roleValue,
+        accessToken: token,
       };
     }
     return null;
