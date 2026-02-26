@@ -42,13 +42,6 @@ type CreateUserModalState = {
   isSubmitting: boolean;
 };
 
-type RoleSection = {
-  key: "sudo_admin" | "admin" | "sales_rep";
-  title: string;
-  users: StaffUser[];
-  emptyMessage: string;
-};
-
 export default function AdminUsersPage() {
   const { user } = useAuth();
   const currentUserId = Number(user?.userId);
@@ -148,9 +141,15 @@ export default function AdminUsersPage() {
       return;
     }
 
-    // Users can only change their own password
-    if (currentUserId !== passwordModal.userId) {
-      toast.error("You can only change your own password");
+    const canUpdatePassword =
+      user?.role === "sudo_admin"
+        ? target.role !== "sudo_admin"
+        : user?.role === "admin"
+          ? target.role === "sales_rep"
+          : false;
+
+    if (!canUpdatePassword) {
+      toast.error("You do not have permission to update this user password");
       return;
     }
 
@@ -257,8 +256,9 @@ export default function AdminUsersPage() {
 
   const canUpdatePasswordFor = (target: StaffUser) => {
     if (!user) return false;
-    // Users can only change their own password
-    return target.id === currentUserId;
+    if (user.role === "sudo_admin") return target.role !== "sudo_admin";
+    if (user.role === "admin") return target.role === "sales_rep";
+    return false;
   };
 
   const canDeleteUser = (target: StaffUser) => {
@@ -365,27 +365,6 @@ export default function AdminUsersPage() {
     return [] as const;
   };
 
-  const roleSections: RoleSection[] = [
-    {
-      key: "sudo_admin",
-      title: "Sudo Admins",
-      users: sudoAdmins,
-      emptyMessage: "No active sudo admins.",
-    },
-    {
-      key: "admin",
-      title: "Admins",
-      users: admins,
-      emptyMessage: "No active admins.",
-    },
-    {
-      key: "sales_rep",
-      title: "Sales Reps",
-      users: salesReps,
-      emptyMessage: "No active sales reps.",
-    },
-  ];
-
   if (loading) {
     return <div className="p-6 text-sm text-gray-500">Loading users...</div>;
   }
@@ -395,29 +374,43 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <UserHeader
-        userRole={user?.role}
-        onCreateClick={handleOpenCreateUserModal}
+    <div className="p-6 space-y-6">
+      <UserHeader userRole={user?.role} onCreateClick={handleOpenCreateUserModal} />
+
+      <UserTable
+        title="Sudo Admins"
+        users={sudoAdmins}
+        emptyMessage="No active sudo admins."
+        canUpdatePasswordFor={canUpdatePasswordFor}
+        canDeleteUser={canDeleteUser}
+        onPasswordClick={handleOpenPasswordModal}
+        onDeleteClick={handleOpenDeleteConfirm}
       />
 
-      {roleSections.map((section) => (
-        <UserTable
-          key={section.key}
-          title={section.title}
-          users={section.users}
-          emptyMessage={section.emptyMessage}
-          canUpdatePasswordFor={canUpdatePasswordFor}
-          canDeleteUser={canDeleteUser}
-          onPasswordClick={handleOpenPasswordModal}
-          onDeleteClick={handleOpenDeleteConfirm}
-        />
-      ))}
+      <UserTable
+        title="Admins"
+        users={admins}
+        emptyMessage="No active admins."
+        canUpdatePasswordFor={canUpdatePasswordFor}
+        canDeleteUser={canDeleteUser}
+        onPasswordClick={handleOpenPasswordModal}
+        onDeleteClick={handleOpenDeleteConfirm}
+      />
+
+      <UserTable
+        title="Sales Reps"
+        users={salesReps}
+        emptyMessage="No active sales reps."
+        canUpdatePasswordFor={canUpdatePasswordFor}
+        canDeleteUser={canDeleteUser}
+        onPasswordClick={handleOpenPasswordModal}
+        onDeleteClick={handleOpenDeleteConfirm}
+      />
 
       <PasswordModal
         userId={passwordModal.userId}
         username={passwordModal.username}
-        isOpen={passwordModal.userId !== null}
+        isOpen={Boolean(passwordModal.userId)}
         isSubmitting={passwordModal.isSubmitting}
         password={passwordModal.password}
         showPassword={passwordModal.showPassword}
@@ -425,7 +418,10 @@ export default function AdminUsersPage() {
           setPasswordModal((prev) => ({ ...prev, password }))
         }
         onShowPasswordToggle={() =>
-          setPasswordModal((prev) => ({ ...prev, showPassword: !prev.showPassword }))
+          setPasswordModal((prev) => ({
+            ...prev,
+            showPassword: !prev.showPassword,
+          }))
         }
         onCancel={handleClosePasswordModal}
         onSubmit={handleSubmitPassword}
@@ -458,7 +454,10 @@ export default function AdminUsersPage() {
           setCreateUserModal((prev) => ({ ...prev, role }))
         }
         onShowPasswordToggle={() =>
-          setCreateUserModal((prev) => ({ ...prev, showPassword: !prev.showPassword }))
+          setCreateUserModal((prev) => ({
+            ...prev,
+            showPassword: !prev.showPassword,
+          }))
         }
         onCancel={handleCloseCreateUserModal}
         onSubmit={handleSubmitCreateUser}
