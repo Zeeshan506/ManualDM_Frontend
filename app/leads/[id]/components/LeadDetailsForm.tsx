@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { Mail, Phone, User, CheckCircle2 } from "lucide-react";
+import { Mail, Phone, User, CheckCircle2, Link2 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -34,22 +35,41 @@ interface LeadDetailsFormProps {
   onLeadUpdated?: (lead: LeadDetails) => void;
 }
 
+type PaymentOption = "custom" | "stripe";
+
 export function LeadDetailsForm({
   activeChat,
   leadDetails,
   onSaveSuccess,
   onLeadUpdated,
 }: LeadDetailsFormProps) {
+  const { user } = useAuth();
   const [nameInput, setNameInput] = useState(leadDetails.name);
   const [emailInput, setEmailInput] = useState(leadDetails.email);
   const [phoneInput, setPhoneInput] = useState(leadDetails.phone);
   const [isSaving, setIsSaving] = useState(false);
+  const [paymentOption, setPaymentOption] = useState<PaymentOption>("custom");
+  const [generatedPaymentLink, setGeneratedPaymentLink] = useState("");
+  const [customPaymentAmount, setCustomPaymentAmount] = useState("");
+  const [customPaymentCurrency, setCustomPaymentCurrency] = useState("USD");
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
   useEffect(() => {
     setNameInput(leadDetails.name);
     setEmailInput(leadDetails.email);
     setPhoneInput(leadDetails.phone);
+    setPaymentOption("custom");
+    setGeneratedPaymentLink("");
+    setCustomPaymentAmount("");
+    setCustomPaymentCurrency("USD");
   }, [leadDetails]);
+
+  const handleGeneratePaymentLink = () => {
+    const optionKey = paymentOption === "custom" ? "custom" : "stripe";
+    const generatedLink = `https://payments.example.com/lead/${activeChat.id}?option=${optionKey}`;
+    setGeneratedPaymentLink(generatedLink);
+    toast.success("Payment link generated (frontend preview only)");
+  };
 
   const handleUpdateContactInfo = async () => {
     if (!nameInput.trim() && !emailInput && !phoneInput) {
@@ -92,6 +112,76 @@ export function LeadDetailsForm({
       );
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleConfirmCustomPayment = async () => {
+    const accessToken = user?.accessToken;
+    if (!accessToken) {
+      toast.error("Authentication required");
+      return;
+    }
+
+    const currency = customPaymentCurrency.trim().toUpperCase();
+    if (currency.length !== 3 || !/^[A-Z]{3}$/.test(currency)) {
+      toast.error("Currency must be a 3-letter ISO code");
+      return;
+    }
+
+    const amount = Number(customPaymentAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error("Amount must be greater than 0");
+      return;
+    }
+
+    setIsSubmittingPayment(true);
+    try {
+      const response = await fetch(
+        `${API_URL}/api/leads/${activeChat.id}/payments/custom`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            amount,
+            currency,
+            send_now: true,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.detail || "Failed to create payment");
+      }
+
+      const result = (await response.json()) as {
+        queued_for_meta?: boolean;
+        meta_event_id?: number;
+      };
+
+      toast.success("Payment recorded successfully");
+      if (result.queued_for_meta) {
+        toast.info(`Purchase event queued to Meta (event #${result.meta_event_id})`);
+      }
+
+      setCustomPaymentAmount("");
+
+      const detailsRes = await fetch(`${API_URL}/api/leads/${activeChat.id}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      if (detailsRes.ok) {
+        const updatedLead = (await detailsRes.json()) as LeadDetails;
+        onLeadUpdated?.(updatedLead);
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to create payment");
+    } finally {
+      setIsSubmittingPayment(false);
     }
   };
 
@@ -168,6 +258,103 @@ export function LeadDetailsForm({
             Saving triggers the <strong>LeadSubmitted</strong> Conversion API
             event.
           </p>
+        </div>
+
+        <div className="mt-8 pt-6 border-t border-gray-100">
+          <label className="block text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+            Payment Settings
+          </label>
+
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => setPaymentOption("custom")}
+              className={`w-full text-left rounded-lg border px-3 py-2 text-sm transition-colors ${
+                paymentOption === "custom"
+                  ? "border-blue-600 bg-blue-50 text-blue-700"
+                  : "border-gray-200 bg-white text-gray-700"
+              }`}
+            >
+              Custom Payments
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setPaymentOption("stripe")}
+              className={`w-full text-left rounded-lg border px-3 py-2 text-sm transition-colors flex items-center justify-between ${
+                paymentOption === "stripe"
+                  ? "border-blue-600 bg-blue-50 text-blue-700"
+                  : "border-gray-200 bg-white text-gray-700"
+              }`}
+            >
+              <span>Stripe Payments</span>
+              <span className="text-[10px] font-semibold text-gray-500">Future</span>
+            </button>
+          </div>
+
+          {paymentOption === "custom" ? (
+            <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
+              <p className="text-xs sm:text-sm font-medium text-gray-700">Custom Payment</p>
+
+              <div>
+                <label className="block text-[11px] sm:text-xs text-gray-600 mb-1">Currency</label>
+                <input
+                  type="text"
+                  value={customPaymentCurrency}
+                  maxLength={3}
+                  onChange={(e) => setCustomPaymentCurrency(e.target.value.toUpperCase())}
+                  placeholder="USD"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] sm:text-xs text-gray-600 mb-1">Amount</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={customPaymentAmount}
+                  onChange={(e) => setCustomPaymentAmount(e.target.value)}
+                  placeholder="0.00"
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleConfirmCustomPayment}
+                disabled={isSubmittingPayment}
+                className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+              >
+                {isSubmittingPayment ? "Confirming..." : "Confirm Payment"}
+              </button>
+            </div>
+          ) : (
+            <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs sm:text-sm font-medium text-gray-700">Generate Link</p>
+                <button
+                  type="button"
+                  onClick={handleGeneratePaymentLink}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                >
+                  <Link2 className="w-3.5 h-3.5" />
+                  Generate Link
+                </button>
+              </div>
+
+              {generatedPaymentLink ? (
+                <div className="mt-3 rounded-md border border-gray-200 bg-white px-2.5 py-2 text-[11px] sm:text-xs text-gray-700 break-all">
+                  {generatedPaymentLink}
+                </div>
+              ) : (
+                <p className="mt-3 text-[11px] sm:text-xs text-gray-500">
+                  Stripe payment links are placeholder-only for now.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
