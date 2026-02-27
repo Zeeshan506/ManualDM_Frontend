@@ -143,7 +143,7 @@ export default function AdminUsersPage() {
 
     const canUpdatePassword =
       user?.role === "sudo_admin"
-        ? target.role !== "sudo_admin"
+        ? target.id === currentUserId || target.role !== "sudo_admin"
         : user?.role === "admin"
           ? target.role === "sales_rep"
           : false;
@@ -256,7 +256,7 @@ export default function AdminUsersPage() {
 
   const canUpdatePasswordFor = (target: StaffUser) => {
     if (!user) return false;
-    if (user.role === "sudo_admin") return target.role !== "sudo_admin";
+    if (user.role === "sudo_admin") return target.id === currentUserId || target.role !== "sudo_admin";
     if (user.role === "admin") return target.role === "sales_rep";
     return false;
   };
