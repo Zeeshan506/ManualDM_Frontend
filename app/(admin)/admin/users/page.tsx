@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { UserHeader } from "./components/UserHeader";
@@ -43,6 +44,7 @@ type CreateUserModalState = {
 };
 
 export default function AdminUsersPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const currentUserId = Number(user?.userId);
   const [staff, setStaff] = useState<StaffUser[]>([]);
@@ -98,6 +100,11 @@ export default function AdminUsersPage() {
   };
 
   useEffect(() => {
+    if (user?.role === "sales_rep") {
+      router.replace("/dashboard");
+      return;
+    }
+
     let cancelled = false;
 
     if (!cancelled) {
@@ -107,7 +114,7 @@ export default function AdminUsersPage() {
     return () => {
       cancelled = true;
     };
-  }, [user?.accessToken]);
+  }, [user?.accessToken, user?.role, router]);
 
   const handleOpenPasswordModal = (userId: number, username: string) => {
     setPasswordModal({
@@ -145,7 +152,7 @@ export default function AdminUsersPage() {
       user?.role === "sudo_admin"
         ? target.id === currentUserId || target.role !== "sudo_admin"
         : user?.role === "admin"
-          ? target.role === "sales_rep"
+          ? target.id === currentUserId || target.role === "sales_rep"
           : false;
 
     if (!canUpdatePassword) {
@@ -257,7 +264,7 @@ export default function AdminUsersPage() {
   const canUpdatePasswordFor = (target: StaffUser) => {
     if (!user) return false;
     if (user.role === "sudo_admin") return target.id === currentUserId || target.role !== "sudo_admin";
-    if (user.role === "admin") return target.role === "sales_rep";
+    if (user.role === "admin") return target.id === currentUserId || target.role === "sales_rep";
     return false;
   };
 
@@ -371,6 +378,10 @@ export default function AdminUsersPage() {
 
   if (error) {
     return <div className="p-6 text-sm text-red-600">{error}</div>;
+  }
+
+  if (user?.role === "sales_rep") {
+    return null;
   }
 
   return (
