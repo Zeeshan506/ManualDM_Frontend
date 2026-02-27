@@ -16,7 +16,7 @@ import { LeadDetailsModal } from "./components/LeadDetailsModal";
 import { ChatPlaceholder } from "./components/ChatPlaceholder";
 import { RightDetailsPanel } from "./components/RightDetailsPanel";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
 let leadsCache: Lead[] | null = null;
 let messagesByLeadCache: Record<number, MessageItem[]> = {};

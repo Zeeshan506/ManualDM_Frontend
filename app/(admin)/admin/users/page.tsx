@@ -9,7 +9,7 @@ import { PasswordModal } from "./components/PasswordModal";
 import { DeleteConfirmModal } from "./components/DeleteConfirmModal";
 import { CreateUserModal } from "./components/CreateUserModal";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
 type StaffUser = {
   id: number;

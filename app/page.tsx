@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 const AUTH_TOKEN_COOKIE = "crm_auth_token";
 const USER_ID_COOKIE = "crm_user_id";
 const USER_ROLE_COOKIE = "crm_user_role";

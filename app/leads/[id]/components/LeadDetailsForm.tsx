@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Mail, Phone, User, CheckCircle2, Link2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
 export interface Lead {
   id: number;

@@ -6,7 +6,7 @@ import { Search } from "lucide-react";
 import { Lead } from "./LeadDetailsForm";
 import { useAuth } from "@/contexts/AuthContext";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
 interface InboxItem extends Lead {
   lastMessage: string;
