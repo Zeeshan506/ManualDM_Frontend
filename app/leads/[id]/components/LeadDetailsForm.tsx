@@ -97,6 +97,10 @@ export function LeadDetailsForm({
         throw new Error(errorData?.detail || "Failed to update lead details.");
       }
 
+      const result = (await response.json()) as {
+        leadsubmitted_event_id?: number | null;
+      };
+
       const detailsRes = await fetch(`${API_URL}/api/leads/${activeChat.id}`);
       if (detailsRes.ok) {
         const updatedLead = (await detailsRes.json()) as LeadDetails;
@@ -104,7 +108,9 @@ export function LeadDetailsForm({
       }
 
       toast.success("Lead details updated successfully!");
-      toast.info("LeadSubmitted event queued for Meta CAPI.");
+      if (result.leadsubmitted_event_id != null) {
+        toast.info("LeadSubmitted event queued for Meta CAPI.");
+      }
       onSaveSuccess?.();
     } catch (error) {
       toast.error(
@@ -255,8 +261,8 @@ export function LeadDetailsForm({
             {isSaving ? "Saving..." : "Save Data & Sync Meta"}
           </button>
           <p className="text-[9px] sm:text-[11px] text-center text-gray-400 mt-3 leading-tight">
-            Saving triggers the <strong>LeadSubmitted</strong> Conversion API
-            event.
+            <strong>LeadSubmitted</strong> is queued only when both email and
+            phone are available.
           </p>
         </div>
 

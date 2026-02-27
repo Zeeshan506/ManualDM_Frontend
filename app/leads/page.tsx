@@ -132,8 +132,14 @@ export default function LeadsDirectory() {
         throw new Error(errorData.detail || "Failed to update lead");
       }
 
+      const result = (await res.json()) as {
+        leadsubmitted_event_id?: number | null;
+      };
+
       toast.success(`Contact info saved for ${activeLead.name || activeLead.igsid}`);
-      toast.info("LeadSubmitted event queued for Meta CAPI.");
+      if (result.leadsubmitted_event_id != null) {
+        toast.info("LeadSubmitted event queued for Meta CAPI.");
+      }
       
       setIsModalOpen(false);
       fetchLeads(); // Refresh the list to reflect updates
@@ -346,7 +352,7 @@ export default function LeadsDirectory() {
                 Save & Trigger Meta CAPI
               </button>
               <p className="text-[11px] text-center text-gray-500 mt-3">
-                This action fires the <strong>LeadSubmitted</strong> event to your Meta pixel.
+                <strong>LeadSubmitted</strong> is queued only when both email and phone are available.
               </p>
             </div>
           </div>
