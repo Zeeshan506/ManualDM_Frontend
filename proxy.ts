@@ -11,6 +11,7 @@ export function proxy(request: NextRequest) {
 
   const isLoginRoute = pathname === "/login";
   const isAdminRoute = pathname.startsWith("/admin");
+  const isTeamActivityRoute = pathname.startsWith("/team-activity");
 
   if (isLoginRoute) {
     return NextResponse.next();
@@ -27,7 +28,7 @@ export function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  if (isAdminRoute && role === "sales_rep") {
+  if ((isAdminRoute || isTeamActivityRoute) && role === "sales_rep") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 

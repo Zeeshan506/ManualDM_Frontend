@@ -2,22 +2,25 @@
 
 import React from "react";
 import { Send } from "lucide-react";
-import { toast } from "sonner";
 
 interface MessageInputProps {
   replyText: string;
   onReplyTextChange: (text: string) => void;
+  onSendMessage: (text: string) => void | Promise<void>;
+  isSending?: boolean;
 }
 
 export function MessageInput({
   replyText,
   onReplyTextChange,
+  onSendMessage,
+  isSending = false,
 }: MessageInputProps) {
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!replyText.trim()) return;
-    toast.success("Message sent to Meta API.");
-    onReplyTextChange("");
+    const text = replyText.trim();
+    if (!text || isSending) return;
+    await onSendMessage(text);
   };
 
   return (
@@ -32,7 +35,7 @@ export function MessageInput({
         />
         <button
           type="submit"
-          disabled={!replyText.trim()}
+          disabled={!replyText.trim() || isSending}
           className="px-3 sm:px-5 py-2.5 sm:py-3 bg-primary text-primary-foreground rounded-xl hover:opacity-90 disabled:opacity-50 transition-colors flex shrink-0"
         >
           <Send className="w-4 h-4 sm:w-5 sm:h-5" />

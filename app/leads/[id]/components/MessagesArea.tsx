@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { format } from "date-fns";
 
 export interface MessageItem {
@@ -17,6 +17,22 @@ interface MessagesAreaProps {
 
 export function MessagesArea({ activeMessages }: MessagesAreaProps) {
   const todayFormatted = format(new Date(), "EEEE, MMMM do");
+  const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
+  const renderedMessages = useMemo(() => {
+    const seen = new Set<string>();
+    return activeMessages.filter((msg) => {
+      const signature = `${msg.id}|${msg.timestamp}|${msg.direction}|${msg.text}`;
+      if (seen.has(signature)) {
+        return false;
+      }
+      seen.add(signature);
+      return true;
+    });
+  }, [activeMessages]);
+
+  useEffect(() => {
+    bottomAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [renderedMessages]);
 
   return (
     <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 bg-gradient-to-b from-background to-muted/35">
@@ -25,10 +41,10 @@ export function MessagesArea({ activeMessages }: MessagesAreaProps) {
           {todayFormatted}
         </span>
       </div>
-      {activeMessages.length > 0 ? (
-        activeMessages.map((msg) => (
+      {renderedMessages.length > 0 ? (
+        renderedMessages.map((msg, index) => (
           <div
-            key={msg.id}
+            key={`${msg.id}-${msg.timestamp}-${msg.direction}-${index}`}
             className={`flex ${
               msg.direction === "outbound" ? "justify-end" : "justify-start"
             }`}
@@ -60,6 +76,7 @@ export function MessagesArea({ activeMessages }: MessagesAreaProps) {
           No messages yet.
         </div>
       )}
+      <div ref={bottomAnchorRef} />
     </div>
   );
 }

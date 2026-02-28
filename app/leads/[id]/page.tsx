@@ -68,6 +68,7 @@ export default function ChatView() {
     () => leadDetailsByIdCache
   );
   const [engagementError, setEngagementError] = useState<string | null>(null);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   const activeChat = useMemo(
     () => leads.find((chat) => chat.id === activeIdNumber),
@@ -186,13 +187,13 @@ export default function ChatView() {
     });
   }, []);
 
-  const fetchLeadDetails = async (leadId: number) => {
+  const fetchLeadDetails = useCallback(async (leadId: number, forceRefresh = false) => {
     const accessToken = user?.accessToken;
     if (!accessToken) {
       return;
     }
 
-    if (leadDetailsByIdCache[leadId]) {
+    if (!forceRefresh && leadDetailsByIdCache[leadId]) {
       setLeadDetailsById((prev) => ({ ...prev, [leadId]: leadDetailsByIdCache[leadId] }));
       return;
     }
@@ -220,7 +221,7 @@ export default function ChatView() {
     } catch {
       // Silent fail; base lead data is already shown
     }
-  };
+  }, [upsertLead, user?.accessToken]);
 
   const fetchLeadsAndMessages = async () => {
     setIsLoading(true);
@@ -322,13 +323,13 @@ export default function ChatView() {
     }
   }, [currentUserId, updateLeadEngagementState, user?.accessToken, user?.role]);
 
-  const fetchMessagesForLead = async (leadId: number) => {
+  const fetchMessagesForLead = useCallback(async (leadId: number, forceRefresh = false) => {
     const accessToken = user?.accessToken;
     if (!accessToken || !Number.isFinite(leadId) || leadId <= 0) {
       return;
     }
 
-    if (messagesByLeadCache[leadId]) {
+    if (!forceRefresh && messagesByLeadCache[leadId]) {
       setMessagesByLead((prev) => ({ ...prev, [leadId]: messagesByLeadCache[leadId] }));
       return;
     }
@@ -353,7 +354,43 @@ export default function ChatView() {
       setMessagesByLead((prev) => ({ ...prev, [leadId]: [] }));
       messagesByLeadCache = { ...messagesByLeadCache, [leadId]: [] };
     }
-  };
+  }, [user?.accessToken]);
+
+  const sendCustomMessage = useCallback(async (text: string) => {
+    const accessToken = user?.accessToken;
+    if (!accessToken || !isValidChatId) {
+      return;
+    }
+
+    setIsSendingMessage(true);
+    try {
+      const response = await fetch(`${API_URL}/api/leads/${activeIdNumber}/messages/custom`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ message_text: text }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const detail = errorData?.detail || "Failed to send message.";
+        throw new Error(detail);
+      }
+
+      await response.json().catch(() => null);
+
+      await fetchMessagesForLead(activeIdNumber);
+
+      setReplyText("");
+      toast.success("Message sent.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send message.");
+    } finally {
+      setIsSendingMessage(false);
+    }
+  }, [activeIdNumber, fetchMessagesForLead, isValidChatId, user?.accessToken]);
 
   // Clear reply input on chat change
   useEffect(() => {
@@ -373,10 +410,25 @@ export default function ChatView() {
 
   useEffect(() => {
     if (isValidChatId) {
-      fetchMessagesForLead(activeIdNumber);
-      fetchLeadDetails(activeIdNumber);
+      fetchMessagesForLead(activeIdNumber, true);
+      fetchLeadDetails(activeIdNumber, true);
     }
   }, [activeIdNumber, isValidChatId, user?.accessToken]);
+
+  useEffect(() => {
+    if (!isValidChatId || !user?.accessToken) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      void fetchMessagesForLead(activeIdNumber, true);
+      void fetchLeadDetails(activeIdNumber, true);
+    }, 3000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [activeIdNumber, fetchMessagesForLead, isValidChatId, user?.accessToken]);
 
   useEffect(() => {
     if (!isValidChatId || user?.role !== "sales_rep") {
@@ -464,6 +516,8 @@ export default function ChatView() {
             <MessageInput
               replyText={replyText}
               onReplyTextChange={setReplyText}
+              onSendMessage={sendCustomMessage}
+              isSending={isSendingMessage}
             />
           </>
         )}

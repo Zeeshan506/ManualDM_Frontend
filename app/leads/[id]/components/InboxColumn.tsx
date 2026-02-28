@@ -57,9 +57,13 @@ export function InboxColumn({
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchLeads = async () => {
+    let cancelled = false;
+
+    const fetchLeads = async (silent = false) => {
       try {
-        setIsLoading(true);
+        if (!silent) {
+          setIsLoading(true);
+        }
         const url = `${API_URL}/api/leads`;
         const accessToken = user?.accessToken;
 
@@ -76,12 +80,18 @@ export function InboxColumn({
         if (!response.ok) throw new Error("Failed to fetch leads");
 
         const data = (await response.json()) as Array<InboxItem & Record<string, unknown>>;
-        setInboxItems(data.map(normalizeInboxItem));
+        if (!cancelled) {
+          setInboxItems(data.map(normalizeInboxItem));
+        }
       } catch (error) {
         console.error("Error fetching leads:", error);
-        setInboxItems([]);
+        if (!cancelled) {
+          setInboxItems([]);
+        }
       } finally {
-        setIsLoading(false);
+        if (!cancelled && !silent) {
+          setIsLoading(false);
+        }
       }
     };
 
@@ -92,6 +102,14 @@ export function InboxColumn({
     }
 
     fetchLeads();
+    const intervalId = window.setInterval(() => {
+      void fetchLeads(true);
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [user?.role, user?.userId, user?.accessToken]);
 
   return (

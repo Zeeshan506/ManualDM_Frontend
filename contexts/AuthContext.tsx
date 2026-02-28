@@ -15,8 +15,10 @@ type AuthContextValue = {
   isAuthenticated: boolean;
   isAuthLoading: boolean;
   login: (user: AuthUser) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 };
+
+const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
 const AUTH_TOKEN_COOKIE = "crm_auth_token";
 const USER_ID_COOKIE = "crm_user_id";
@@ -72,12 +74,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(nextUser);
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    const token = user?.accessToken;
+    if (token) {
+      try {
+        await fetch(`${API_URL}/api/logout`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      } catch {
+      }
+    }
+
     clearCookie(AUTH_TOKEN_COOKIE);
     clearCookie(USER_ID_COOKIE);
     clearCookie(USER_ROLE_COOKIE);
     setUser(null);
-  }, []);
+  }, [user?.accessToken]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
