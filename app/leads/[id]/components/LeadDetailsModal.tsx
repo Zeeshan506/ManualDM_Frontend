@@ -22,16 +22,16 @@ export function LeadDetailsModal({
   if (!isOpen || !activeChat) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 lg:hidden">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 lg:hidden backdrop-blur-[2px]">
       {/* Modal Background click to close */}
       <div className="absolute inset-0" onClick={onClose}></div>
 
-      <div className="relative w-full max-w-md bg-white sm:rounded-2xl rounded-t-2xl shadow-xl overflow-hidden animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:zoom-in-95 max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between p-4 border-b border-gray-100">
-          <h3 className="font-bold text-gray-900">Lead Information</h3>
+      <div className="relative w-full max-w-md bg-card border border-border sm:rounded-2xl rounded-t-2xl shadow-xl overflow-hidden animate-in slide-in-from-bottom-4 sm:slide-in-from-bottom-0 sm:zoom-in-95 max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-border bg-muted/30">
+          <h3 className="font-bold text-card-foreground">Lead Information</h3>
           <button
             onClick={onClose}
-            className="p-1 text-gray-400 hover:bg-gray-100 rounded-full"
+            className="p-1 text-muted-foreground hover:bg-accent rounded-full"
           >
             <X className="w-5 h-5" />
           </button>

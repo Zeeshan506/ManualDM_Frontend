@@ -102,14 +102,19 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold text-gray-900">Sign in</h1>
-        <p className="mt-1 text-sm text-gray-500">Use your CRM account credentials.</p>
+    <div className="relative min-h-screen w-full flex items-center justify-center px-4 py-8">
+      <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top,theme(colors.primary/.18),transparent_50%)]" />
+
+      <div className="relative w-full max-w-md rounded-3xl border border-border/80 bg-card/95 p-6 sm:p-7 shadow-lg backdrop-blur">
+        <div className="mb-6">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">PSC CRM</p>
+          <h1 className="mt-2 text-2xl font-semibold text-foreground">Sign in</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Use your CRM account credentials.</p>
+        </div>
 
         <form onSubmit={handleLogin} className="mt-6 space-y-4">
           <div className="space-y-2">
-            <label htmlFor="username" className="text-sm font-medium text-gray-700">
+            <label htmlFor="username" className="text-sm font-medium text-foreground/90">
               Username
             </label>
             <Input
@@ -123,7 +128,7 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-2">
-            <label htmlFor="password" className="text-sm font-medium text-gray-700">
+            <label htmlFor="password" className="text-sm font-medium text-foreground/90">
               Password
             </label>
             <Input
@@ -137,15 +142,15 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm font-medium text-gray-700">Role</p>
+            <p className="text-sm font-medium text-foreground/90">Role</p>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setRole("admin")}
                 className={`rounded-md border px-3 py-2 text-sm transition-colors ${
                   role === "admin"
-                    ? "border-gray-900 bg-gray-900 text-white"
-                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 }`}
               >
                 Admin
@@ -155,8 +160,8 @@ export default function LoginPage() {
                 onClick={() => setRole("sales_rep")}
                 className={`rounded-md border px-3 py-2 text-sm transition-colors ${
                   role === "sales_rep"
-                    ? "border-gray-900 bg-gray-900 text-white"
-                    : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 }`}
               >
                 Sales Rep
@@ -165,14 +170,14 @@ export default function LoginPage() {
           </div>
 
           {errorMessage && (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
               {errorMessage}
             </div>
           )}
 
           <div className="pt-1 text-sm">
             {role === "admin" ? (
-              <Link href="/login?reset=true" className="text-blue-600 hover:text-blue-700 hover:underline">
+              <Link href="/login?reset=true" className="text-primary hover:opacity-80 hover:underline">
                 Forgot password? Reset here.
               </Link>
             ) : (
@@ -182,7 +187,7 @@ export default function LoginPage() {
                   setShowAssistanceModal(true);
                   setAssistanceRequested(false);
                 }}
-                className="text-blue-600 hover:text-blue-700 hover:underline"
+                className="text-primary hover:opacity-80 hover:underline"
               >
                 Need password help? Request manager assistance.
               </button>
@@ -196,15 +201,15 @@ export default function LoginPage() {
       </div>
 
       {showAssistanceModal && role === "sales_rep" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-5 shadow-lg">
-            <h2 className="text-lg font-semibold text-gray-900">Manager Assistance</h2>
-            <p className="mt-2 text-sm text-gray-600">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-xl">
+            <h2 className="text-lg font-semibold text-card-foreground">Manager Assistance</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
               Send a reset request to your reporting manager for account verification.
             </p>
 
             {assistanceRequested && (
-              <p className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+              <p className="mt-3 rounded-md border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
                 Request sent successfully. Your manager will contact you shortly.
               </p>
             )}

@@ -13,6 +13,35 @@ interface InboxItem extends Lead {
   time: string;
 }
 
+function normalizeInboxItem(raw: InboxItem & Record<string, unknown>): InboxItem {
+  const engagedByUserIdRaw = raw.engagedByUserId ?? raw.engaged_by_user_id ?? raw.assigned_to ?? null;
+  const engagedByUserId = typeof engagedByUserIdRaw === "number" ? engagedByUserIdRaw : null;
+
+  const engagedByUsernameRaw = raw.engagedByUsername ?? raw.engaged_by_username ?? null;
+  const engagedByUsername = typeof engagedByUsernameRaw === "string" ? engagedByUsernameRaw : null;
+
+  const isEngagedRaw = raw.isEngaged ?? raw.is_engaged;
+  const isEngaged =
+    typeof isEngagedRaw === "boolean"
+      ? isEngagedRaw
+      : engagedByUserId !== null;
+
+  return {
+    ...raw,
+    lastMessage: typeof raw.lastMessage === "string" ? raw.lastMessage : "",
+    time: typeof raw.time === "string" ? raw.time : "",
+    engagedByUserId,
+    engagedByUsername,
+    isEngaged,
+  };
+}
+
+function getOwnershipBadgeLabel(chat: InboxItem): string {
+  const owner = chat.engagedByUsername ? `Owner: ${chat.engagedByUsername}` : "Owner: Unassigned";
+  const occupancy = chat.isEngaged ? "Occupied" : "Unoccupied";
+  return `${owner} • ${occupancy}`;
+}
+
 interface InboxColumnProps {
   isVisible: boolean;
   activeId: number;
@@ -31,23 +60,12 @@ export function InboxColumn({
     const fetchLeads = async () => {
       try {
         setIsLoading(true);
-        let url = `${API_URL}/api/leads`;
+        const url = `${API_URL}/api/leads`;
         const accessToken = user?.accessToken;
-        const currentUserId = Number(user?.userId);
 
         if (!accessToken) {
           setInboxItems([]);
           return;
-        }
-
-        // If the user is a Sales Rep, append the query parameter to only fetch THEIR leads.
-        // If the user is an Admin, we leave the URL alone to fetch everything.
-        if (user?.role === "sales_rep") {
-          if (!Number.isFinite(currentUserId)) {
-            setInboxItems([]);
-            return;
-          }
-          url += `?assigned_to=${currentUserId}`;
         }
 
         const response = await fetch(url, {
@@ -57,8 +75,8 @@ export function InboxColumn({
         });
         if (!response.ok) throw new Error("Failed to fetch leads");
 
-        const data = await response.json();
-        setInboxItems(data);
+        const data = (await response.json()) as Array<InboxItem & Record<string, unknown>>;
+        setInboxItems(data.map(normalizeInboxItem));
       } catch (error) {
         console.error("Error fetching leads:", error);
         setInboxItems([]);
@@ -78,46 +96,49 @@ export function InboxColumn({
 
   return (
     <div
-      className={`w-full md:w-80 border-r border-gray-200 bg-white shrink-0 flex flex-col ${isVisible ? "flex" : "hidden md:flex"}`}
+      className={`w-full md:w-80 border-r border-border bg-card shrink-0 flex flex-col ${isVisible ? "flex" : "hidden md:flex"}`}
     >
-      <div className="p-3 sm:p-4 border-b border-gray-200">
-        <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4">
+      <div className="p-3 sm:p-4 border-b border-border">
+        <h2 className="text-base sm:text-lg font-bold text-card-foreground mb-3 sm:mb-4">
           Active Chats
         </h2>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input
             type="text"
             placeholder="Search messages..."
-            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full pl-9 pr-3 py-2 bg-background border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+      <div className="flex-1 overflow-y-auto divide-y divide-border/70">
         {isLoading ? (
-          <div className="p-4 text-sm text-gray-500">Loading chats...</div>
+          <div className="p-4 text-sm text-muted-foreground">Loading chats...</div>
         ) : inboxItems.length === 0 ? (
-          <div className="p-4 text-sm text-gray-500">No leads found.</div>
+          <div className="p-4 text-sm text-muted-foreground">No leads found.</div>
         ) : (
           inboxItems.map((chat) => (
             <Link
               href={`/leads/${chat.id}`}
               key={chat.id}
-              className={`block p-3 sm:p-4 transition-colors relative ${activeId === chat.id ? "bg-blue-50" : "hover:bg-gray-50"}`}
+              className={`block p-3 sm:p-4 transition-colors relative ${activeId === chat.id ? "bg-primary/10" : "hover:bg-accent"}`}
             >
               {activeId === chat.id && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 rounded-r-full" />
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-r-full" />
               )}
               <div className="flex justify-between items-baseline mb-1 gap-2">
-                <h3 className="font-semibold text-sm truncate pr-2 text-gray-700">
+                <h3 className="font-semibold text-sm truncate pr-2 text-foreground">
                   {chat.name || chat.igsid || `Lead #${chat.id}`}
                 </h3>
-                <span className="text-[10px] sm:text-[11px] text-gray-400 whitespace-nowrap">
+                <span className="text-[10px] sm:text-[11px] text-muted-foreground whitespace-nowrap">
                   {chat.time}
                 </span>
               </div>
-              <p className="text-xs truncate text-gray-500">{chat.lastMessage}</p>
+              <p className="text-xs truncate text-muted-foreground">{chat.lastMessage}</p>
+              <span className={`inline-flex mt-1 items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${chat.isEngaged ? "border-amber-200 bg-amber-50 text-amber-700" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+                {getOwnershipBadgeLabel(chat)}
+              </span>
             </Link>
           ))
         )}

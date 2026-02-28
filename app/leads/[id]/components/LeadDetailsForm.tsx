@@ -15,6 +15,9 @@ export interface Lead {
   email: string;
   phone: string;
   lastActive: string | null;
+  engagedByUserId?: number | null;
+  engagedByUsername?: string | null;
+  isEngaged?: boolean;
 }
 
 export interface LeadDetails {
@@ -26,6 +29,9 @@ export interface LeadDetails {
   phone: string;
   metaEventFired: boolean;
   createdAt: string;
+  engagedByUserId?: number | null;
+  engagedByUsername?: string | null;
+  isEngaged?: boolean;
 }
 
 interface LeadDetailsFormProps {
@@ -194,14 +200,14 @@ export function LeadDetailsForm({
   return (
     <div className="flex flex-col h-full overflow-y-auto">
       {/* Profile Summary */}
-      <div className="p-4 sm:p-6 border-b border-gray-100 flex flex-col items-center text-center">
-        <div className="w-16 sm:w-20 h-16 sm:h-20 rounded-full bg-gradient-to-br from-indigo-100 to-purple-100 border-2 border-white shadow-md flex items-center justify-center mb-2 sm:mb-3">
-          <User className="w-6 sm:w-8 h-6 sm:h-8 text-indigo-400" />
+      <div className="p-4 sm:p-6 border-b border-border flex flex-col items-center text-center">
+        <div className="w-16 sm:w-20 h-16 sm:h-20 rounded-full bg-primary/12 border-2 border-primary/25 shadow-md flex items-center justify-center mb-2 sm:mb-3">
+          <User className="w-6 sm:w-8 h-6 sm:h-8 text-primary" />
         </div>
-        <h2 className="font-bold text-gray-900 text-base sm:text-lg">
+        <h2 className="font-bold text-card-foreground text-base sm:text-lg">
           {activeChat.name || "Unknown User"}
         </h2>
-        <span className="text-[10px] sm:text-xs font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded mt-1 sm:mt-2">
+        <span className="text-[10px] sm:text-xs font-mono text-muted-foreground bg-muted px-2 py-1 rounded mt-1 sm:mt-2">
           {activeChat.igsid}
         </span>
       </div>
@@ -209,7 +215,7 @@ export function LeadDetailsForm({
       {/* Contact Form */}
       <div className="p-4 sm:p-6 flex-1 pb-10">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-          <label className="block text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <label className="block text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider">
             Contact Details
           </label>
           {leadDetails.metaEventFired && (
@@ -221,33 +227,33 @@ export function LeadDetailsForm({
 
         <div className="space-y-4">
           <div className="relative">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="text"
               value={nameInput}
               onChange={(e) => setNameInput(e.target.value)}
               placeholder="Custom Name"
-              className="w-full pl-9 pr-3 py-2 sm:py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"
+              className="w-full pl-9 pr-3 py-2 sm:py-2.5 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring text-sm shadow-sm"
             />
           </div>
           <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="email"
               value={emailInput}
               onChange={(e) => setEmailInput(e.target.value)}
               placeholder="Email Address"
-              className="w-full pl-9 pr-3 py-2 sm:py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"
+              className="w-full pl-9 pr-3 py-2 sm:py-2.5 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring text-sm shadow-sm"
             />
           </div>
           <div className="relative">
-            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="tel"
               value={phoneInput}
               onChange={(e) => setPhoneInput(e.target.value)}
               placeholder="Phone Number"
-              className="w-full pl-9 pr-3 py-2 sm:py-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm"
+              className="w-full pl-9 pr-3 py-2 sm:py-2.5 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring text-sm shadow-sm"
             />
           </div>
         </div>
@@ -256,18 +262,18 @@ export function LeadDetailsForm({
           <button
             onClick={handleUpdateContactInfo}
             disabled={isSaving}
-            className="w-full py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition-colors flex justify-center items-center gap-2 text-sm"
+            className="w-full py-2 sm:py-2.5 bg-primary hover:opacity-90 text-primary-foreground font-medium rounded-lg shadow-sm transition-colors flex justify-center items-center gap-2 text-sm"
           >
             {isSaving ? "Saving..." : "Save Data & Sync Meta"}
           </button>
-          <p className="text-[9px] sm:text-[11px] text-center text-gray-400 mt-3 leading-tight">
+          <p className="text-[9px] sm:text-[11px] text-center text-muted-foreground mt-3 leading-tight">
             <strong>LeadSubmitted</strong> is queued only when both email and
             phone are available.
           </p>
         </div>
 
-        <div className="mt-8 pt-6 border-t border-gray-100">
-          <label className="block text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+        <div className="mt-8 pt-6 border-t border-border">
+          <label className="block text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
             Payment Settings
           </label>
 
@@ -277,8 +283,8 @@ export function LeadDetailsForm({
               onClick={() => setPaymentOption("custom")}
               className={`w-full text-left rounded-lg border px-3 py-2 text-sm transition-colors ${
                 paymentOption === "custom"
-                  ? "border-blue-600 bg-blue-50 text-blue-700"
-                  : "border-gray-200 bg-white text-gray-700"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-background text-foreground"
               }`}
             >
               Custom Payments
@@ -289,33 +295,33 @@ export function LeadDetailsForm({
               onClick={() => setPaymentOption("stripe")}
               className={`w-full text-left rounded-lg border px-3 py-2 text-sm transition-colors flex items-center justify-between ${
                 paymentOption === "stripe"
-                  ? "border-blue-600 bg-blue-50 text-blue-700"
-                  : "border-gray-200 bg-white text-gray-700"
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-background text-foreground"
               }`}
             >
               <span>Stripe Payments</span>
-              <span className="text-[10px] font-semibold text-gray-500">Future</span>
+              <span className="text-[10px] font-semibold text-muted-foreground">Future</span>
             </button>
           </div>
 
           {paymentOption === "custom" ? (
-            <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 space-y-3">
-              <p className="text-xs sm:text-sm font-medium text-gray-700">Custom Payment</p>
+            <div className="mt-4 rounded-lg border border-border bg-muted/45 p-3 space-y-3">
+              <p className="text-xs sm:text-sm font-medium text-foreground">Custom Payment</p>
 
               <div>
-                <label className="block text-[11px] sm:text-xs text-gray-600 mb-1">Currency</label>
+                <label className="block text-[11px] sm:text-xs text-muted-foreground mb-1">Currency</label>
                 <input
                   type="text"
                   value={customPaymentCurrency}
                   maxLength={3}
                   onChange={(e) => setCustomPaymentCurrency(e.target.value.toUpperCase())}
                   placeholder="USD"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] sm:text-xs text-gray-600 mb-1">Amount</label>
+                <label className="block text-[11px] sm:text-xs text-muted-foreground mb-1">Amount</label>
                 <input
                   type="number"
                   min="0"
@@ -323,7 +329,7 @@ export function LeadDetailsForm({
                   value={customPaymentAmount}
                   onChange={(e) => setCustomPaymentAmount(e.target.value)}
                   placeholder="0.00"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 text-sm border border-border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
 
@@ -331,19 +337,19 @@ export function LeadDetailsForm({
                 type="button"
                 onClick={handleConfirmCustomPayment}
                 disabled={isSubmittingPayment}
-                className="w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
+                className="w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-60"
               >
                 {isSubmittingPayment ? "Confirming..." : "Confirm Payment"}
               </button>
             </div>
           ) : (
-            <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <div className="mt-4 rounded-lg border border-border bg-muted/45 p-3">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-xs sm:text-sm font-medium text-gray-700">Generate Link</p>
+                <p className="text-xs sm:text-sm font-medium text-foreground">Generate Link</p>
                 <button
                   type="button"
                   onClick={handleGeneratePaymentLink}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:opacity-90"
                 >
                   <Link2 className="w-3.5 h-3.5" />
                   Generate Link
@@ -351,11 +357,11 @@ export function LeadDetailsForm({
               </div>
 
               {generatedPaymentLink ? (
-                <div className="mt-3 rounded-md border border-gray-200 bg-white px-2.5 py-2 text-[11px] sm:text-xs text-gray-700 break-all">
+                <div className="mt-3 rounded-md border border-border bg-background px-2.5 py-2 text-[11px] sm:text-xs text-foreground break-all">
                   {generatedPaymentLink}
                 </div>
               ) : (
-                <p className="mt-3 text-[11px] sm:text-xs text-gray-500">
+                <p className="mt-3 text-[11px] sm:text-xs text-muted-foreground">
                   Stripe payment links are placeholder-only for now.
                 </p>
               )}

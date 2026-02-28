@@ -19,7 +19,7 @@ export function RightDetailsPanel({
   if (!isVisible || !activeChat) return null;
 
   return (
-    <div className="hidden lg:flex w-80 bg-white border-l border-gray-200 flex-col shrink-0 shadow-[-4px_0_24px_-16px_rgba(0,0,0,0.1)] z-20">
+    <div className="hidden lg:flex w-80 bg-card border-l border-border flex-col shrink-0 shadow-[-4px_0_24px_-16px_rgba(0,0,0,0.12)] z-20">
       <LeadDetailsForm
         activeChat={activeChat}
         leadDetails={leadDetails}

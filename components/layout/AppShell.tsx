@@ -11,17 +11,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isLoginRoute = useMemo(() => pathname === "/login", [pathname]);
 
   if (isLoginRoute) {
-    return <main className="min-h-screen bg-gray-50">{children}</main>;
+    return <main className="min-h-screen bg-background">{children}</main>;
   }
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col sm:flex-row">
+    <div className="h-dvh overflow-hidden flex flex-col sm:flex-row">
       <SidebarProvider>
         <AppSidebar />
 
-        <main className="relative flex-1 flex flex-col h-full bg-gray-50 overflow-y-auto">
-          <SidebarTrigger className="absolute top-2 right-2 sm:top-4 sm:right-4 z-50" />
-          {children}
+        <main className="relative flex-1 flex flex-col min-h-0 bg-background/60 overflow-y-auto backdrop-blur-[2px]">
+          <SidebarTrigger className="fixed top-3 right-3 z-50 md:absolute md:top-4 md:right-4 bg-card/90 backdrop-blur border border-border shadow-sm hover:bg-accent" />
+          <div className="pt-12 md:pt-0 min-h-full">{children}</div>
         </main>
       </SidebarProvider>
     </div>

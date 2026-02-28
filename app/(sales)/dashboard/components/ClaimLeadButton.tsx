@@ -34,14 +34,32 @@ export default function ClaimLeadButton({ leadId }: ClaimLeadButtonProps) {
         },
       });
 
-      if (!res.ok) throw new Error("Failed to claim lead.");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => null);
+        throw new Error(errorData?.detail || "Failed to claim lead.");
+      }
 
-      toast.success("Lead claimed! Moving to chat...");
+      const data = (await res.json()) as {
+        ownerUserId?: number | null;
+        ownerUsername?: string | null;
+      };
+
+      const currentUserId = Number(user.userId);
+      const claimedByCurrentUser = Number.isFinite(currentUserId) && data.ownerUserId === currentUserId;
+
+      if (claimedByCurrentUser) {
+        toast.success("Lead claimed! Moving to chat...");
+      } else if (data.ownerUsername) {
+        toast.info(`Chat belongs to ${data.ownerUsername}. You can still open and reply.`);
+      } else {
+        toast.info("Opening chat...");
+      }
 
       router.push(`/leads/${leadId}`);
       router.refresh();
     } catch (error) {
-      toast.error("Could not claim lead. Someone else might have grabbed it!");
+      const message = error instanceof Error ? error.message : "Could not open chat right now.";
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
