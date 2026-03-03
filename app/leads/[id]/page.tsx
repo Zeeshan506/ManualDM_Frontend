@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -17,6 +18,7 @@ import { ChatPlaceholder } from "./components/ChatPlaceholder";
 import { RightDetailsPanel } from "./components/RightDetailsPanel";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
+const MESSAGE_PAGE_SIZE = 30;
 
 let leadsCache: Lead[] | null = null;
 let messagesByLeadCache: Record<number, MessageItem[]> = {};
@@ -68,7 +70,8 @@ export default function ChatView() {
     () => leadDetailsByIdCache
   );
   const [engagementError, setEngagementError] = useState<string | null>(null);
-  const [isSendingMessage, setIsSendingMessage] = useState(false);
+  const [optimisticMessagesByLead, setOptimisticMessagesByLead] = useState<Record<number, MessageItem[]>>({});
+  const [visibleCountsByLead, setVisibleCountsByLead] = useState<Record<number, number>>({});
 
   const activeChat = useMemo(
     () => leads.find((chat) => chat.id === activeIdNumber),
@@ -137,7 +140,24 @@ export default function ChatView() {
     } as Lead;
   }, [activeChat, activeIdNumber, isValidChatId, leadDetailsById]);
   
-  const activeMessages = messagesByLead[activeIdNumber] || [];
+  const allServerMessagesForLead = useMemo(
+    () => messagesByLead[activeIdNumber] || [],
+    [activeIdNumber, messagesByLead]
+  );
+  const visibleServerCount = visibleCountsByLead[activeIdNumber] ?? MESSAGE_PAGE_SIZE;
+  const paginatedServerMessages = useMemo(() => {
+    const startIndex = Math.max(0, allServerMessagesForLead.length - visibleServerCount);
+    return allServerMessagesForLead.slice(startIndex);
+  }, [allServerMessagesForLead, visibleServerCount]);
+  const activeOptimisticMessages = useMemo(
+    () => optimisticMessagesByLead[activeIdNumber] || [],
+    [activeIdNumber, optimisticMessagesByLead]
+  );
+  const activeMessages = useMemo(
+    () => [...paginatedServerMessages, ...activeOptimisticMessages],
+    [activeOptimisticMessages, paginatedServerMessages]
+  );
+  const hasOlderMessages = allServerMessagesForLead.length > paginatedServerMessages.length;
   const activeLeadDetails = leadDetailsById[activeIdNumber] || {
     id: isValidChatId ? activeIdNumber : 0,
     igsid: resolvedActiveChat?.igsid || null,
@@ -348,8 +368,56 @@ export default function ChatView() {
       }
 
       const messagesData = (await messagesRes.json()) as MessageItem[];
-      messagesByLeadCache = { ...messagesByLeadCache, [leadId]: messagesData };
-      setMessagesByLead((prev) => ({ ...prev, [leadId]: messagesData }));
+      const normalizedMessages = messagesData.map((message) => ({
+        ...message,
+        deliveryStatus: message.direction === "outbound" ? "delivered" as const : undefined,
+      }));
+
+      messagesByLeadCache = { ...messagesByLeadCache, [leadId]: normalizedMessages };
+      setMessagesByLead((prev) => ({ ...prev, [leadId]: normalizedMessages }));
+      setVisibleCountsByLead((prev) => {
+        const total = normalizedMessages.length;
+        const existing = prev[leadId] ?? 0;
+        const nextValue = existing > 0
+          ? Math.min(existing, total)
+          : Math.min(MESSAGE_PAGE_SIZE, Math.max(total, 0));
+        return {
+          ...prev,
+          [leadId]: nextValue,
+        };
+      });
+      setOptimisticMessagesByLead((prev) => {
+        const current = prev[leadId] || [];
+        if (current.length === 0) {
+          return prev;
+        }
+
+        const confirmedOutbound = normalizedMessages.filter((message) => message.direction === "outbound");
+        const remaining = current.filter((message) => {
+          if (message.deliveryStatus === "failed") {
+            return true;
+          }
+
+          const optimisticTimestamp = Date.parse(message.timestamp);
+          return !confirmedOutbound.some((confirmed) => {
+            if (confirmed.text !== message.text) {
+              return false;
+            }
+
+            const confirmedTimestamp = Date.parse(confirmed.timestamp);
+            if (!Number.isFinite(optimisticTimestamp) || !Number.isFinite(confirmedTimestamp)) {
+              return true;
+            }
+
+            return Math.abs(confirmedTimestamp - optimisticTimestamp) <= 2 * 60 * 1000;
+          });
+        });
+
+        return {
+          ...prev,
+          [leadId]: remaining,
+        };
+      });
     } catch {
       setMessagesByLead((prev) => ({ ...prev, [leadId]: [] }));
       messagesByLeadCache = { ...messagesByLeadCache, [leadId]: [] };
@@ -362,7 +430,30 @@ export default function ChatView() {
       return;
     }
 
-    setIsSendingMessage(true);
+    const trimmedText = text.trim();
+    if (!trimmedText) {
+      return;
+    }
+
+    const localTimestamp = new Date();
+    const optimisticId = -Date.now();
+    const clientMessageId = `local-${activeIdNumber}-${localTimestamp.getTime()}`;
+    const optimisticMessage: MessageItem = {
+      id: optimisticId,
+      clientMessageId,
+      text: trimmedText,
+      direction: "outbound",
+      time: format(localTimestamp, "hh:mm a"),
+      timestamp: localTimestamp.toISOString(),
+      deliveryStatus: "sending",
+    };
+
+    setOptimisticMessagesByLead((prev) => ({
+      ...prev,
+      [activeIdNumber]: [...(prev[activeIdNumber] || []), optimisticMessage],
+    }));
+    setReplyText("");
+
     try {
       const response = await fetch(`${API_URL}/api/leads/${activeIdNumber}/messages/custom`, {
         method: "POST",
@@ -370,7 +461,7 @@ export default function ChatView() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ message_text: text }),
+        body: JSON.stringify({ message_text: trimmedText }),
       });
 
       if (!response.ok) {
@@ -380,17 +471,58 @@ export default function ChatView() {
       }
 
       await response.json().catch(() => null);
+      setOptimisticMessagesByLead((prev) => ({
+        ...prev,
+        [activeIdNumber]: (prev[activeIdNumber] || []).map((message) =>
+          message.clientMessageId === clientMessageId
+            ? { ...message, deliveryStatus: "sent" }
+            : message
+        ),
+      }));
 
-      await fetchMessagesForLead(activeIdNumber);
+      window.setTimeout(() => {
+        setOptimisticMessagesByLead((prev) => ({
+          ...prev,
+          [activeIdNumber]: (prev[activeIdNumber] || []).map((message) =>
+            message.clientMessageId === clientMessageId && message.deliveryStatus !== "failed"
+              ? { ...message, deliveryStatus: "delivered" }
+              : message
+          ),
+        }));
+      }, 600);
 
-      setReplyText("");
-      toast.success("Message sent.");
+      void fetchMessagesForLead(activeIdNumber, true);
     } catch (error) {
+      setOptimisticMessagesByLead((prev) => ({
+        ...prev,
+        [activeIdNumber]: (prev[activeIdNumber] || []).map((message) =>
+          message.clientMessageId === clientMessageId
+            ? { ...message, deliveryStatus: "failed" }
+            : message
+        ),
+      }));
       toast.error(error instanceof Error ? error.message : "Failed to send message.");
-    } finally {
-      setIsSendingMessage(false);
     }
   }, [activeIdNumber, fetchMessagesForLead, isValidChatId, user?.accessToken]);
+
+  const loadOlderMessages = useCallback(() => {
+    if (!isValidChatId) {
+      return;
+    }
+
+    const totalMessages = allServerMessagesForLead.length;
+    setVisibleCountsByLead((prev) => {
+      const currentVisible = prev[activeIdNumber] ?? MESSAGE_PAGE_SIZE;
+      if (currentVisible >= totalMessages) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        [activeIdNumber]: Math.min(totalMessages, currentVisible + MESSAGE_PAGE_SIZE),
+      };
+    });
+  }, [activeIdNumber, allServerMessagesForLead.length, isValidChatId]);
 
   // Clear reply input on chat change
   useEffect(() => {
@@ -512,12 +644,17 @@ export default function ChatView() {
                 {engagementError}
               </div>
             )}
-            <MessagesArea activeMessages={activeMessages} />
+            <MessagesArea
+              activeMessages={activeMessages}
+              hasOlderMessages={hasOlderMessages}
+              isLoadingOlder={false}
+              onLoadOlderMessages={loadOlderMessages}
+            />
             <MessageInput
               replyText={replyText}
               onReplyTextChange={setReplyText}
               onSendMessage={sendCustomMessage}
-              isSending={isSendingMessage}
+              isSending={false}
             />
           </>
         )}

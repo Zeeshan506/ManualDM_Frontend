@@ -19,7 +19,7 @@ export function MessageInput({
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = replyText.trim();
-    if (!text || isSending) return;
+    if (!text) return;
     await onSendMessage(text);
   };
 
@@ -35,8 +35,9 @@ export function MessageInput({
         />
         <button
           type="submit"
-          disabled={!replyText.trim() || isSending}
+          disabled={!replyText.trim()}
           className="px-3 sm:px-5 py-2.5 sm:py-3 bg-primary text-primary-foreground rounded-xl hover:opacity-90 disabled:opacity-50 transition-colors flex shrink-0"
+          aria-busy={isSending}
         >
           <Send className="w-4 h-4 sm:w-5 sm:h-5" />
         </button>
