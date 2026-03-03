@@ -32,6 +32,15 @@ type EngagementPayload = {
 
 type LeadListItemUpdate = Partial<Omit<Lead, "id">>;
 
+type LiveMessagePayload = {
+  id?: number;
+  text?: string;
+  direction?: "inbound" | "outbound";
+  time?: string;
+  timestamp?: string;
+  type?: string;
+};
+
 function normalizeLead(raw: Lead & Record<string, unknown>): Lead {
   const engagedByUserIdRaw = raw.engagedByUserId ?? raw.engaged_by_user_id ?? raw.assigned_to ?? null;
   const engagedByUserId = typeof engagedByUserIdRaw === "number" ? engagedByUserIdRaw : null;
@@ -66,6 +75,7 @@ export default function ChatView() {
   const [messagesByLead, setMessagesByLead] = useState<Record<number, MessageItem[]>>(
     () => messagesByLeadCache
   );
+  const [liveMessagesByLead, setLiveMessagesByLead] = useState<Record<number, MessageItem[]>>({});
   const [leadDetailsById, setLeadDetailsById] = useState<Record<number, LeadDetails>>(
     () => leadDetailsByIdCache
   );
@@ -153,9 +163,13 @@ export default function ChatView() {
     () => optimisticMessagesByLead[activeIdNumber] || [],
     [activeIdNumber, optimisticMessagesByLead]
   );
+  const activeLiveMessages = useMemo(
+    () => liveMessagesByLead[activeIdNumber] || [],
+    [activeIdNumber, liveMessagesByLead]
+  );
   const activeMessages = useMemo(
-    () => [...paginatedServerMessages, ...activeOptimisticMessages],
-    [activeOptimisticMessages, paginatedServerMessages]
+    () => [...paginatedServerMessages, ...activeLiveMessages, ...activeOptimisticMessages],
+    [activeLiveMessages, activeOptimisticMessages, paginatedServerMessages]
   );
   const hasOlderMessages = allServerMessagesForLead.length > paginatedServerMessages.length;
   const activeLeadDetails = leadDetailsById[activeIdNumber] || {
@@ -418,6 +432,24 @@ export default function ChatView() {
           [leadId]: remaining,
         };
       });
+
+      setLiveMessagesByLead((prev) => {
+        const current = prev[leadId] || [];
+        if (current.length === 0) {
+          return prev;
+        }
+
+        const serverIds = new Set(normalizedMessages.map((message) => message.id));
+        const remaining = current.filter((message) => !serverIds.has(message.id));
+        if (remaining.length === current.length) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          [leadId]: remaining,
+        };
+      });
     } catch {
       setMessagesByLead((prev) => ({ ...prev, [leadId]: [] }));
       messagesByLeadCache = { ...messagesByLeadCache, [leadId]: [] };
@@ -491,7 +523,6 @@ export default function ChatView() {
         }));
       }, 600);
 
-      void fetchMessagesForLead(activeIdNumber, true);
     } catch (error) {
       setOptimisticMessagesByLead((prev) => ({
         ...prev,
@@ -504,6 +535,134 @@ export default function ChatView() {
       toast.error(error instanceof Error ? error.message : "Failed to send message.");
     }
   }, [activeIdNumber, fetchMessagesForLead, isValidChatId, user?.accessToken]);
+
+  useEffect(() => {
+    if (!isValidChatId) {
+      return;
+    }
+
+    let socket: WebSocket | null = null;
+    let reconnectTimer: number | null = null;
+    let isClosedByEffect = false;
+
+    const normalizeIncomingMessage = (payload: LiveMessagePayload): MessageItem | null => {
+      if (typeof payload.id !== "number") {
+        return null;
+      }
+
+      const direction = payload.direction === "outbound" ? "outbound" : "inbound";
+      const timestamp =
+        typeof payload.timestamp === "string" && payload.timestamp.length > 0
+          ? payload.timestamp
+          : new Date().toISOString();
+      const time =
+        typeof payload.time === "string" && payload.time.length > 0
+          ? payload.time
+          : format(new Date(timestamp), "hh:mm a");
+
+      return {
+        id: payload.id,
+        text: typeof payload.text === "string" ? payload.text : "",
+        direction,
+        time,
+        timestamp,
+        deliveryStatus: direction === "outbound" ? "delivered" : undefined,
+      };
+    };
+
+    const connect = () => {
+      const rawBase = API_URL || window.location.origin;
+      const wsBase = rawBase.replace(/^http:\/\//i, "ws://").replace(/^https:\/\//i, "wss://").replace(/\/$/, "");
+      const wsUrl = `${wsBase}/api/ws/leads/${activeIdNumber}`;
+
+      socket = new WebSocket(wsUrl);
+
+      console.info("[WS] connecting", { leadId: activeIdNumber, wsUrl });
+
+      socket.onopen = () => {
+        console.info("[WS] connected", { leadId: activeIdNumber, wsUrl });
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          console.info("[WS] raw message", { leadId: activeIdNumber, data: event.data });
+          const payload = JSON.parse(event.data) as LiveMessagePayload;
+          console.info("[WS] parsed message", { leadId: activeIdNumber, payload });
+          if (payload.type !== "new_message") {
+            console.info("[WS] ignored message type", { leadId: activeIdNumber, type: payload.type });
+            return;
+          }
+
+          const incoming = normalizeIncomingMessage(payload);
+          if (!incoming) {
+            return;
+          }
+
+          setMessagesByLead((prev) => {
+            const current = prev[activeIdNumber] || [];
+            if (current.some((message) => message.id === incoming.id)) {
+              return prev;
+            }
+
+            const merged = [...current, incoming];
+            messagesByLeadCache = {
+              ...messagesByLeadCache,
+              [activeIdNumber]: merged,
+            };
+
+            return {
+              ...prev,
+              [activeIdNumber]: merged,
+            };
+          });
+
+          setVisibleCountsByLead((prev) => {
+            const currentVisible = prev[activeIdNumber];
+            if (currentVisible === 0) {
+              return {
+                ...prev,
+                [activeIdNumber]: 1,
+              };
+            }
+            return prev;
+          });
+
+          upsertLead(activeIdNumber, {
+            lastActive: incoming.timestamp,
+          });
+        } catch {
+          console.warn("[WS] failed to parse message", { leadId: activeIdNumber, data: event.data });
+        }
+      };
+
+      socket.onerror = (event) => {
+        console.error("[WS] error", { leadId: activeIdNumber, event });
+      };
+
+      socket.onclose = () => {
+        console.warn("[WS] closed", { leadId: activeIdNumber, wsUrl });
+        if (isClosedByEffect) {
+          return;
+        }
+
+        reconnectTimer = window.setTimeout(() => {
+          connect();
+        }, 1000);
+      };
+    };
+
+    connect();
+
+    return () => {
+      isClosedByEffect = true;
+      if (reconnectTimer !== null) {
+        window.clearTimeout(reconnectTimer);
+      }
+      if (socket && socket.readyState !== WebSocket.CLOSED) {
+        socket.close();
+      }
+    };
+  }, [activeIdNumber, isValidChatId, upsertLead]);
 
   const loadOlderMessages = useCallback(() => {
     if (!isValidChatId) {
@@ -546,21 +705,6 @@ export default function ChatView() {
       fetchLeadDetails(activeIdNumber, true);
     }
   }, [activeIdNumber, isValidChatId, user?.accessToken]);
-
-  useEffect(() => {
-    if (!isValidChatId || !user?.accessToken) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      void fetchMessagesForLead(activeIdNumber, true);
-      void fetchLeadDetails(activeIdNumber, true);
-    }, 3000);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [activeIdNumber, fetchMessagesForLead, isValidChatId, user?.accessToken]);
 
   useEffect(() => {
     if (!isValidChatId || user?.role !== "sales_rep") {
