@@ -19,6 +19,7 @@ import { RightDetailsPanel } from "./components/RightDetailsPanel";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 const MESSAGE_PAGE_SIZE = 30;
+const OPTIMISTIC_MATCH_WINDOW_MS = 2 * 60 * 1000;
 
 let leadsCache: Lead[] | null = null;
 let messagesByLeadCache: Record<number, MessageItem[]> = {};
@@ -534,7 +535,83 @@ export default function ChatView() {
       }));
       toast.error(error instanceof Error ? error.message : "Failed to send message.");
     }
-  }, [activeIdNumber, fetchMessagesForLead, isValidChatId, user?.accessToken]);
+  }, [activeIdNumber, isValidChatId, user?.accessToken]);
+
+  const retryFailedMessage = useCallback(async (message: MessageItem) => {
+    const accessToken = user?.accessToken;
+    if (!accessToken || !isValidChatId || !message.clientMessageId) {
+      return;
+    }
+
+    const trimmedText = message.text.trim();
+    if (!trimmedText) {
+      return;
+    }
+
+    const retryTimestamp = new Date();
+    setOptimisticMessagesByLead((prev) => ({
+      ...prev,
+      [activeIdNumber]: (prev[activeIdNumber] || []).map((entry) =>
+        entry.clientMessageId === message.clientMessageId
+          ? {
+              ...entry,
+              text: trimmedText,
+              time: format(retryTimestamp, "hh:mm a"),
+              timestamp: retryTimestamp.toISOString(),
+              deliveryStatus: "sending",
+            }
+          : entry
+      ),
+    }));
+
+    try {
+      const response = await fetch(`${API_URL}/api/leads/${activeIdNumber}/messages/custom`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ message_text: trimmedText }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        const detail = errorData?.detail || "Failed to send message.";
+        throw new Error(detail);
+      }
+
+      await response.json().catch(() => null);
+      setOptimisticMessagesByLead((prev) => ({
+        ...prev,
+        [activeIdNumber]: (prev[activeIdNumber] || []).map((entry) =>
+          entry.clientMessageId === message.clientMessageId
+            ? { ...entry, deliveryStatus: "sent" }
+            : entry
+        ),
+      }));
+
+      window.setTimeout(() => {
+        setOptimisticMessagesByLead((prev) => ({
+          ...prev,
+          [activeIdNumber]: (prev[activeIdNumber] || []).map((entry) =>
+            entry.clientMessageId === message.clientMessageId && entry.deliveryStatus !== "failed"
+              ? { ...entry, deliveryStatus: "delivered" }
+              : entry
+          ),
+        }));
+      }, 600);
+    } catch (error) {
+      setOptimisticMessagesByLead((prev) => ({
+        ...prev,
+        [activeIdNumber]: (prev[activeIdNumber] || []).map((entry) =>
+          entry.clientMessageId === message.clientMessageId
+            ? { ...entry, deliveryStatus: "failed" }
+            : entry
+        ),
+      }));
+      toast.error(error instanceof Error ? error.message : "Failed to send message.");
+    }
+  }, [activeIdNumber, isValidChatId, user?.accessToken]);
 
   useEffect(() => {
     if (!isValidChatId) {
@@ -615,6 +692,53 @@ export default function ChatView() {
               [activeIdNumber]: merged,
             };
           });
+
+          if (incoming.direction === "outbound") {
+            setOptimisticMessagesByLead((prev) => {
+              const current = prev[activeIdNumber] || [];
+              if (current.length === 0) {
+                return prev;
+              }
+
+              const incomingTimestamp = Date.parse(incoming.timestamp);
+              let bestMatchIndex = -1;
+              let bestMatchDelta = Number.POSITIVE_INFINITY;
+
+              current.forEach((message, index) => {
+                if (message.direction !== "outbound" || message.deliveryStatus === "failed") {
+                  return;
+                }
+
+                if (message.text !== incoming.text) {
+                  return;
+                }
+
+                const optimisticTimestamp = Date.parse(message.timestamp);
+                const timestampComparable = Number.isFinite(incomingTimestamp) && Number.isFinite(optimisticTimestamp);
+                const timestampDelta = timestampComparable
+                  ? Math.abs(incomingTimestamp - optimisticTimestamp)
+                  : 0;
+
+                if (timestampComparable && timestampDelta > OPTIMISTIC_MATCH_WINDOW_MS) {
+                  return;
+                }
+
+                if (timestampDelta < bestMatchDelta) {
+                  bestMatchDelta = timestampDelta;
+                  bestMatchIndex = index;
+                }
+              });
+
+              if (bestMatchIndex < 0) {
+                return prev;
+              }
+
+              return {
+                ...prev,
+                [activeIdNumber]: current.filter((_, index) => index !== bestMatchIndex),
+              };
+            });
+          }
 
           setVisibleCountsByLead((prev) => {
             const currentVisible = prev[activeIdNumber];
@@ -793,6 +917,7 @@ export default function ChatView() {
               hasOlderMessages={hasOlderMessages}
               isLoadingOlder={false}
               onLoadOlderMessages={loadOlderMessages}
+              onRetryMessage={retryFailedMessage}
             />
             <MessageInput
               replyText={replyText}

@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
+import { RotateCcw } from "lucide-react";
 
 export interface MessageItem {
   id: number;
@@ -18,6 +19,7 @@ interface MessagesAreaProps {
   hasOlderMessages?: boolean;
   isLoadingOlder?: boolean;
   onLoadOlderMessages?: () => void;
+  onRetryMessage?: (message: MessageItem) => void | Promise<void>;
 }
 
 const BOTTOM_THRESHOLD_PX = 72;
@@ -50,6 +52,7 @@ export function MessagesArea({
   hasOlderMessages = false,
   isLoadingOlder = false,
   onLoadOlderMessages,
+  onRetryMessage,
 }: MessagesAreaProps) {
   const todayFormatted = format(new Date(), "EEEE, MMMM do");
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -245,9 +248,22 @@ export function MessagesArea({
                     return (
                       <div
                         key={`${msg.clientMessageId ?? msg.id}-${msg.timestamp}-${messageIndex}`}
-                        className={`flex ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}
+                        className={`flex items-end gap-2 ${msg.direction === "outbound" ? "justify-end" : "justify-start"}`}
                         title={resolveTimeLabel(msg)}
                       >
+                        {msg.direction === "outbound" && msg.deliveryStatus === "failed" && onRetryMessage && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void onRetryMessage(msg);
+                            }}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"
+                            aria-label="Retry failed message"
+                            title="Retry"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                         <div
                           className={`group max-w-[85%] sm:max-w-[75%] lg:max-w-[60%] px-4 py-2.5 shadow-sm text-sm transition-colors ${
                             msg.direction === "outbound"

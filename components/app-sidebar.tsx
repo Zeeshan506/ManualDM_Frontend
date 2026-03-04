@@ -10,6 +10,7 @@ import {
   LogOut,
   MessageSquare,
 } from "lucide-react"
+import { NotificationCenter } from "@/components/notifications/NotificationCenter"
 import {
   Sidebar,
   SidebarContent,
@@ -90,6 +91,7 @@ export function AppSidebar() {
               </SidebarMenuItem>
             )
           })}
+          <NotificationCenter />
         </SidebarMenu>
       </SidebarContent>
 
