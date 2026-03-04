@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Info, MoreVertical } from "lucide-react";
+import { ChevronLeft, Info } from "lucide-react";
 import { Lead } from "./LeadDetailsForm";
 
 interface ChatHeaderProps {
@@ -44,15 +44,12 @@ export function ChatHeader({ activeChat, onInfoClick, engagementLabel }: ChatHea
       </div>
 
       <div className="flex items-center gap-1">
-        {/* Info Button - Opens Modal on Mobile & Tablet (Hidden on Desktop) */}
+        {/* Info Button - Opens modal on small screens, toggles side details panel on desktop */}
         <button
           onClick={onInfoClick}
-          className="lg:hidden p-2 text-primary bg-primary/10 hover:bg-primary/15 rounded-full transition-colors flex items-center gap-2"
+          className="p-2 text-primary bg-primary/10 hover:bg-primary/15 rounded-full transition-colors flex items-center gap-2"
         >
           <Info className="w-5 h-5" />
-        </button>
-        <button className="hidden sm:block p-2 text-muted-foreground hover:text-foreground hover:bg-accent rounded-full transition-colors">
-          <MoreVertical className="w-5 h-5" />
         </button>
       </div>
     </div>

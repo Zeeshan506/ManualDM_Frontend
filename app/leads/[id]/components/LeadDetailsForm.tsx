@@ -32,6 +32,11 @@ export interface LeadDetails {
   engagedByUserId?: number | null;
   engagedByUsername?: string | null;
   isEngaged?: boolean;
+  deadRequested?: boolean;
+  deadRequestedByUserId?: number | null;
+  deadRequestedAt?: string | null;
+  deadMarkedByUserId?: number | null;
+  deadMarkedAt?: string | null;
 }
 
 interface LeadDetailsFormProps {
@@ -59,6 +64,13 @@ export function LeadDetailsForm({
   const [customPaymentAmount, setCustomPaymentAmount] = useState("");
   const [customPaymentCurrency, setCustomPaymentCurrency] = useState("USD");
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const [isSubmittingDeadAction, setIsSubmittingDeadAction] = useState(false);
+  const [isDeletingLead, setIsDeletingLead] = useState(false);
+
+  const userRole = user?.role;
+  const canRequestDead = userRole === "sales_rep";
+  const canMarkDead = userRole === "admin" || userRole === "sudo_admin";
+  const canDeleteLead = canMarkDead;
 
   useEffect(() => {
     setNameInput(leadDetails.name);
@@ -194,6 +206,113 @@ export function LeadDetailsForm({
       toast.error(error instanceof Error ? error.message : "Failed to create payment");
     } finally {
       setIsSubmittingPayment(false);
+    }
+  };
+
+  const refreshLeadDetails = async (accessToken?: string) => {
+    const detailsRes = await fetch(`${API_URL}/api/leads/${activeChat.id}`, {
+      headers: {
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
+    });
+    if (detailsRes.ok) {
+      const updatedLead = (await detailsRes.json()) as LeadDetails;
+      onLeadUpdated?.(updatedLead);
+    }
+  };
+
+  const handleRequestDead = async () => {
+    const accessToken = user?.accessToken;
+    if (!accessToken) {
+      toast.error("Authentication required");
+      return;
+    }
+
+    setIsSubmittingDeadAction(true);
+    try {
+      const response = await fetch(`${API_URL}/api/leads/${activeChat.id}/dead-request`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.detail || "Failed to request dead lead");
+      }
+
+      toast.success("Dead lead request submitted for admin review");
+      await refreshLeadDetails(accessToken);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to request dead lead");
+    } finally {
+      setIsSubmittingDeadAction(false);
+    }
+  };
+
+  const handleMarkDead = async () => {
+    const accessToken = user?.accessToken;
+    if (!accessToken) {
+      toast.error("Authentication required");
+      return;
+    }
+
+    setIsSubmittingDeadAction(true);
+    try {
+      const response = await fetch(`${API_URL}/api/leads/${activeChat.id}/mark-dead`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.detail || "Failed to mark lead dead");
+      }
+
+      toast.success("Lead marked as dead");
+      await refreshLeadDetails(accessToken);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to mark lead dead");
+    } finally {
+      setIsSubmittingDeadAction(false);
+    }
+  };
+
+  const handleDeleteLead = async () => {
+    const accessToken = user?.accessToken;
+    if (!accessToken) {
+      toast.error("Authentication required");
+      return;
+    }
+
+    const confirmed = window.confirm("Delete this lead permanently? This cannot be undone.");
+    if (!confirmed) {
+      return;
+    }
+
+    setIsDeletingLead(true);
+    try {
+      const response = await fetch(`${API_URL}/api/leads/${activeChat.id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.detail || "Failed to delete lead");
+      }
+
+      toast.success("Lead deleted successfully");
+      window.location.href = "/leads";
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to delete lead");
+    } finally {
+      setIsDeletingLead(false);
     }
   };
 
@@ -367,6 +486,49 @@ export function LeadDetailsForm({
               )}
             </div>
           )}
+        </div>
+
+        <div className="mt-8 pt-6 border-t border-border space-y-3">
+          <label className="block text-[10px] sm:text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+            Lead Lifecycle
+          </label>
+
+          {leadDetails.status === "dead" ? (
+            <p className="text-xs text-destructive font-medium">This lead is marked dead.</p>
+          ) : null}
+
+          {canRequestDead ? (
+            <button
+              type="button"
+              onClick={handleRequestDead}
+              disabled={isSubmittingDeadAction || Boolean(leadDetails.deadRequested) || leadDetails.status === "dead"}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-foreground hover:bg-accent disabled:opacity-60"
+            >
+              {leadDetails.deadRequested ? "Dead Request Pending" : isSubmittingDeadAction ? "Submitting..." : "Request Mark as Dead"}
+            </button>
+          ) : null}
+
+          {canMarkDead ? (
+            <button
+              type="button"
+              onClick={handleMarkDead}
+              disabled={isSubmittingDeadAction || leadDetails.status === "dead"}
+              className="w-full rounded-md bg-destructive px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-60"
+            >
+              {isSubmittingDeadAction ? "Marking..." : "Mark Lead as Dead"}
+            </button>
+          ) : null}
+
+          {canDeleteLead ? (
+            <button
+              type="button"
+              onClick={handleDeleteLead}
+              disabled={isDeletingLead}
+              className="w-full rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/15 disabled:opacity-60"
+            >
+              {isDeletingLead ? "Deleting..." : "Delete Lead Record"}
+            </button>
+          ) : null}
         </div>
       </div>
     </div>

@@ -71,6 +71,7 @@ export default function ChatView() {
   const isValidChatId = Number.isFinite(activeIdNumber) && activeIdNumber > 0;
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDesktopDetailsOpen, setIsDesktopDetailsOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [leads, setLeads] = useState<Lead[]>(() => leadsCache ?? []);
@@ -867,6 +868,10 @@ export default function ChatView() {
     };
   }, [activeIdNumber, currentUserId, engageChat, isValidChatId, releaseChat, user?.accessToken, user?.role]);
 
+  useEffect(() => {
+    setIsDesktopDetailsOpen(false);
+  }, [activeIdNumber]);
+
   if (isLoading) {
     return (
       <div className="flex h-full w-full bg-card overflow-hidden relative border border-border/70 rounded-2xl">
@@ -919,7 +924,13 @@ export default function ChatView() {
           <>
             <ChatHeader
               activeChat={resolvedActiveChat}
-              onInfoClick={() => setIsModalOpen(true)}
+              onInfoClick={() => {
+                if (typeof window !== "undefined" && window.matchMedia("(min-width: 1024px)").matches) {
+                  setIsDesktopDetailsOpen((prev) => !prev);
+                  return;
+                }
+                setIsModalOpen(true);
+              }}
               engagementLabel={
                 `Owner: ${resolvedActiveChat?.engagedByUsername || "Unassigned"} • ${
                   resolvedActiveChat?.isEngaged ? "Occupied" : "Unoccupied"
@@ -950,7 +961,7 @@ export default function ChatView() {
 
       {/* ================= RIGHT COLUMN: DESKTOP DETAILS ================= */}
       <RightDetailsPanel
-        isVisible={isValidChatId && !!resolvedActiveChat}
+        isVisible={isValidChatId && !!resolvedActiveChat && isDesktopDetailsOpen}
         activeChat={resolvedActiveChat}
         leadDetails={activeLeadDetails}
         onLeadUpdated={(updatedLead) => {
