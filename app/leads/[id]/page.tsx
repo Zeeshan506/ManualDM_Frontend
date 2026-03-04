@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api-client";
 import {
   Lead,
   LeadDetails,
@@ -234,10 +235,13 @@ export default function ChatView() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/leads/${leadId}`, {
+      const response = await apiFetch(`${API_URL}/api/leads/${leadId}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
+        timeoutMs: 10000,
+        retry: { retries: 1 },
+        throttleKey: `lead:details:${leadId}`,
       });
       if (!response.ok) return;
       const details = (await response.json()) as LeadDetails;
@@ -258,7 +262,7 @@ export default function ChatView() {
     }
   }, [upsertLead, user?.accessToken]);
 
-  const fetchLeadsAndMessages = async () => {
+  const fetchLeadsAndMessages = useCallback(async () => {
     setIsLoading(true);
     try {
       const leadsUrl = `${API_URL}/api/leads`;
@@ -270,10 +274,13 @@ export default function ChatView() {
         return;
       }
 
-      const leadsRes = await fetch(leadsUrl, {
+      const leadsRes = await apiFetch(leadsUrl, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
+        timeoutMs: 12000,
+        retry: { retries: 1 },
+        throttleKey: "leads:list:chat-view",
       });
       if (!leadsRes.ok) {
         throw new Error("Failed to fetch leads.");
@@ -290,7 +297,7 @@ export default function ChatView() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.accessToken]);
 
   const engageChat = useCallback(async (leadId: number) => {
     const accessToken = user?.accessToken;
@@ -303,12 +310,14 @@ export default function ChatView() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/leads/${leadId}/assign`, {
+      const response = await apiFetch(`${API_URL}/api/leads/${leadId}/assign`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
+        timeoutMs: 10000,
+        minIntervalMs: 500,
       });
 
       if (!response.ok) {
@@ -339,12 +348,14 @@ export default function ChatView() {
     }
 
     try {
-      const response = await fetch(`${API_URL}/api/leads/${leadId}/release`, {
+      const response = await apiFetch(`${API_URL}/api/leads/${leadId}/release`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
+        timeoutMs: 10000,
+        minIntervalMs: 500,
       });
 
       if (!response.ok) {
@@ -370,10 +381,14 @@ export default function ChatView() {
     }
 
     try {
-      const messagesRes = await fetch(`${API_URL}/api/leads/${leadId}/messages`, {
+      const messagesRes = await apiFetch(`${API_URL}/api/leads/${leadId}/messages`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
+        timeoutMs: 10000,
+        minIntervalMs: 500,
+        retry: { retries: 1 },
+        throttleKey: `lead:messages:${leadId}`,
       });
 
       if (!messagesRes.ok) {
@@ -488,13 +503,15 @@ export default function ChatView() {
     setReplyText("");
 
     try {
-      const response = await fetch(`${API_URL}/api/leads/${activeIdNumber}/messages/custom`, {
+      const response = await apiFetch(`${API_URL}/api/leads/${activeIdNumber}/messages/custom`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ message_text: trimmedText }),
+        timeoutMs: 10000,
+        minIntervalMs: 300,
       });
 
       if (!response.ok) {
@@ -565,13 +582,15 @@ export default function ChatView() {
     }));
 
     try {
-      const response = await fetch(`${API_URL}/api/leads/${activeIdNumber}/messages/custom`, {
+      const response = await apiFetch(`${API_URL}/api/leads/${activeIdNumber}/messages/custom`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
         body: JSON.stringify({ message_text: trimmedText }),
+        timeoutMs: 10000,
+        minIntervalMs: 300,
       });
 
       if (!response.ok) {
@@ -820,15 +839,15 @@ export default function ChatView() {
       return;
     }
 
-    fetchLeadsAndMessages();
-  }, [user?.role, user?.userId, user?.accessToken]);
+    void fetchLeadsAndMessages();
+  }, [fetchLeadsAndMessages, user]);
 
   useEffect(() => {
     if (isValidChatId) {
-      fetchMessagesForLead(activeIdNumber, true);
-      fetchLeadDetails(activeIdNumber, true);
+      void fetchMessagesForLead(activeIdNumber, true);
+      void fetchLeadDetails(activeIdNumber, true);
     }
-  }, [activeIdNumber, isValidChatId, user?.accessToken]);
+  }, [activeIdNumber, fetchLeadDetails, fetchMessagesForLead, isValidChatId]);
 
   useEffect(() => {
     if (!isValidChatId || user?.role !== "sales_rep") {

@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LogOut,
   MessageSquare,
+  Users,
 } from "lucide-react"
 import { NotificationCenter } from "@/components/notifications/NotificationCenter"
 import {
@@ -34,7 +35,7 @@ export function AppSidebar() {
 
   const adminNavItems = [
     { href: "/admin", label: "Dashboard", tooltip: "Dashboard", icon: LayoutDashboard },
-    { href: "/admin/users", label: "Users", tooltip: "Users", icon: Activity },
+    { href: "/admin/users", label: "Users", tooltip: "Users", icon: Users },
     { href: "/team-activity", label: "Team Activity", tooltip: "Team Activity", icon: Activity },
     { href: "/leads", label: "Leads", tooltip: "Leads", icon: MessageSquare },
     { href: "/chats", label: "All Chats", tooltip: "All Chats", icon: MessageSquare },
@@ -47,7 +48,7 @@ export function AppSidebar() {
   ]
 
   const superAdminNavItems = [
-    { href: "/admin/users", label: "Users", tooltip: "Users", icon: Activity },
+    { href: "/admin/users", label: "Users", tooltip: "Users", icon: Users },
     { href: "/admin", label: "Dashboard", tooltip: "Dashboard", icon: LayoutDashboard },
     { href: "/team-activity", label: "Team Activity", tooltip: "Team Activity", icon: Activity },
     { href: "/dashboard", label: "Unassigned Pool", tooltip: "Unassigned Pool", icon: Inbox },

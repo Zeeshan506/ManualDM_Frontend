@@ -5,6 +5,7 @@ import { RefreshCw } from "lucide-react";
 import { ActivityBadge, type ActionType } from "./ActivityBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { apiFetch } from "@/lib/api-client";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
@@ -52,10 +53,14 @@ export function ActivityLogTable() {
 
       try {
         if (viewMode === "50") {
-          const response = await fetch(`${API_URL}/api/sudo/team-activity/logs?limit=50&page=1`, {
+          const response = await apiFetch(`${API_URL}/api/sudo/team-activity/logs?limit=50&page=1`, {
             headers: {
               Authorization: `Bearer ${user.accessToken}`,
             },
+            timeoutMs: 10000,
+            minIntervalMs: 800,
+            retry: { retries: 1 },
+            throttleKey: "team-activity:logs:latest50",
           });
 
           if (!response.ok) {
@@ -71,12 +76,16 @@ export function ActivityLogTable() {
           const allItems: ActivityLogItem[] = [];
 
           while (hasNext) {
-            const response = await fetch(
+            const response = await apiFetch(
               `${API_URL}/api/sudo/team-activity/logs?limit=${pageSize}&page=${page}`,
               {
                 headers: {
                   Authorization: `Bearer ${user.accessToken}`,
                 },
+                timeoutMs: 12000,
+                minIntervalMs: 500,
+                retry: { retries: 1 },
+                throttleKey: `team-activity:logs:page:${page}`,
               }
             );
 
@@ -115,6 +124,7 @@ export function ActivityLogTable() {
 
     const runFetch = async () => {
       if (cancelled) return;
+      if (typeof document !== "undefined" && document.hidden) return;
       await fetchLogs(false);
     };
 

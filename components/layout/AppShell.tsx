@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -8,8 +7,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-
-  const isLoginRoute = useMemo(() => pathname === "/login", [pathname]);
+  const isLoginRoute = pathname === "/login";
 
   if (isLoginRoute) {
     return <main className="min-h-screen bg-background">{children}</main>;

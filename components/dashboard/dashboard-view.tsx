@@ -10,6 +10,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api-client";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
@@ -70,8 +71,14 @@ export function DashboardView() {
     setIsActivityLoading(true);
 
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `${API_URL}/api/dashboard/activity?limit=${ACTIVITY_PAGE_SIZE}&page=${page}&include_meta=true`
+        , {
+          timeoutMs: 10000,
+          minIntervalMs: 500,
+          retry: { retries: 1 },
+          throttleKey: `dashboard:activity:page:${page}`,
+        }
       );
 
       if (!response.ok) {
@@ -103,7 +110,12 @@ export function DashboardView() {
       setError(null);
 
       try {
-        const statsRes = await fetch(`${API_URL}/api/dashboard/stats`);
+        const statsRes = await apiFetch(`${API_URL}/api/dashboard/stats`, {
+          timeoutMs: 10000,
+          minIntervalMs: 600,
+          retry: { retries: 1 },
+          throttleKey: "dashboard:stats",
+        });
         if (!statsRes.ok) {
           throw new Error("Failed to load dashboard stats.");
         }

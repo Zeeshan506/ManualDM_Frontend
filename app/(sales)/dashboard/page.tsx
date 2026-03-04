@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { MessageSquare, User, Clock, Zap, Inbox, RefreshCcw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api-client";
 
 // Components
 import ClaimLeadButton from "./components/ClaimLeadButton";
@@ -34,7 +35,7 @@ export default function UnassignedPoolPage() {
     return now - lastActiveTime <= fiveHoursInMs;
   };
 
-  const fetchUnassignedLeads = async (silent = false) => {
+  const fetchUnassignedLeads = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     setIsRefreshing(true);
 
@@ -46,10 +47,14 @@ export default function UnassignedPoolPage() {
     }
 
     try {
-      const res = await fetch(`${API_URL}/api/leads?status=unassigned`, {
+      const res = await apiFetch(`${API_URL}/api/leads?status=unassigned`, {
         headers: {
           Authorization: `Bearer ${user.accessToken}`,
         },
+        timeoutMs: 10000,
+        minIntervalMs: 750,
+        retry: { retries: 1 },
+        throttleKey: "leads:unassigned",
       });
       if (res.ok) {
         const data = (await res.json()) as UnassignedLead[];
@@ -61,7 +66,7 @@ export default function UnassignedPoolPage() {
       setLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, [user?.accessToken]);
 
   useEffect(() => {
     const isAuthorized = user?.role === "sales_rep" || user?.role === "admin" || user?.role === "sudo_admin";
@@ -71,11 +76,16 @@ export default function UnassignedPoolPage() {
       return;
     }
 
-    fetchUnassignedLeads();
+    void fetchUnassignedLeads();
     
-    const interval = setInterval(() => fetchUnassignedLeads(true), 10000);
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) {
+        return;
+      }
+      void fetchUnassignedLeads(true);
+    }, 10000);
     return () => clearInterval(interval);
-  }, [user?.role, user?.accessToken]);
+  }, [fetchUnassignedLeads, user?.role]);
 
   if (loading) {
     return (
@@ -103,7 +113,7 @@ if (user?.role !== "sales_rep" && user?.role !== "admin" && user?.role !== "sudo
   }
 
   return (
-    <div className="w-full bg-slate-50/50 dark:bg-transparent px-3 py-4 sm:px-4 sm:py-6 md:px-8 lg:px-10">
+    <div className="w-full bg-background px-3 py-4 sm:px-4 sm:py-6 md:px-8 lg:px-10">
       {/* Header Section */}
       <div className="max-w-[1600px] mx-auto mb-4 sm:mb-6">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -112,7 +122,7 @@ if (user?.role !== "sales_rep" && user?.role !== "admin" && user?.role !== "sudo
               <div className="p-1.5 bg-primary/10 rounded-lg text-primary">
                 <Inbox className="h-5 w-5" />
               </div>
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-slate-50">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight text-foreground">
                 Unassigned Pool
               </h1>
             </div>
@@ -125,13 +135,13 @@ if (user?.role !== "sales_rep" && user?.role !== "admin" && user?.role !== "sudo
              <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => fetchUnassignedLeads()}
-              className="flex items-center gap-1 bg-white dark:bg-slate-950 shadow-sm text-xs md:text-sm"
+              onClick={() => void fetchUnassignedLeads()}
+              className="flex items-center gap-1 bg-card shadow-sm text-xs md:text-sm"
             >
               <RefreshCcw className={`h-3.5 w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Sync</span>
             </Button>
-            <div className="flex items-center bg-white dark:bg-slate-900 border rounded-full px-3 sm:px-4 py-1.5 shadow-sm">
+            <div className="flex items-center bg-card border border-border rounded-full px-3 sm:px-4 py-1.5 shadow-sm">
               <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse mr-2" />
               <span className="text-xs sm:text-sm font-bold whitespace-nowrap">{leads.length} Available</span>
             </div>

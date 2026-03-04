@@ -68,7 +68,7 @@ export function LeadDetailsForm({
     setGeneratedPaymentLink("");
     setCustomPaymentAmount("");
     setCustomPaymentCurrency("USD");
-  }, [leadDetails]);
+  }, [leadDetails.id, leadDetails.name, leadDetails.email, leadDetails.phone]);
 
   const handleGeneratePaymentLink = () => {
     const optionKey = paymentOption === "custom" ? "custom" : "stripe";

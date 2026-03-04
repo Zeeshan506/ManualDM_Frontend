@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { 
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api-client";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
@@ -67,7 +68,7 @@ export default function LeadsDirectory() {
   const [phoneInput, setPhoneInput] = useState("");
 
   // Fetch leads from backend
-  const fetchLeads = async () => {
+  const fetchLeads = useCallback(async () => {
     setIsLoading(true);
     try {
       const url = `${API_URL}/api/leads`;
@@ -78,10 +79,14 @@ export default function LeadsDirectory() {
         return;
       }
 
-      const res = await fetch(url, {
+      const res = await apiFetch(url, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
+        timeoutMs: 10000,
+        minIntervalMs: 700,
+        retry: { retries: 1 },
+        throttleKey: "leads:list:directory",
       });
       if (!res.ok) throw new Error("Failed to fetch leads");
       const data = (await res.json()) as Array<Lead & Record<string, unknown>>;
@@ -101,7 +106,7 @@ export default function LeadsDirectory() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user?.accessToken, user?.role]);
 
   useEffect(() => {
     if (!user) {
@@ -110,8 +115,8 @@ export default function LeadsDirectory() {
       return;
     }
 
-    fetchLeads();
-  }, [user?.role, user?.userId, user?.accessToken]);
+    void fetchLeads();
+  }, [fetchLeads, user]);
 
   // Filtering Logic
   const filteredLeads = leads.filter((lead) => {
@@ -147,14 +152,19 @@ export default function LeadsDirectory() {
     if (!activeLead) return;
     
     try {
-      const res = await fetch(`${API_URL}/leads/${activeLead.id}/contact-details`, {
+      const res = await apiFetch(`${API_URL}/api/leads/${activeLead.id}/contact-details`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(user?.accessToken ? { Authorization: `Bearer ${user.accessToken}` } : {}),
+        },
         body: JSON.stringify({ 
           name: nameInput.trim() || null,
           email: emailInput || null, 
           phone: phoneInput || null 
         }),
+        timeoutMs: 10000,
+        minIntervalMs: 250,
       });
 
       if (!res.ok) {
@@ -172,7 +182,7 @@ export default function LeadsDirectory() {
       }
       
       setIsModalOpen(false);
-      fetchLeads(); // Refresh the list to reflect updates
+      void fetchLeads(); // Refresh the list to reflect updates
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Failed to update lead";
       toast.error(message);

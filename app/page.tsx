@@ -87,7 +87,7 @@ export default function RoleRoutingHubPage() {
   }, [router]);
 
   return (
-    <div className="h-full min-h-[calc(100vh-4rem)] w-full flex items-center justify-center text-sm text-gray-500">
+    <div className="h-full min-h-[calc(100vh-4rem)] w-full flex items-center justify-center text-sm text-muted-foreground">
       Routing to your dashboard...
     </div>
   );

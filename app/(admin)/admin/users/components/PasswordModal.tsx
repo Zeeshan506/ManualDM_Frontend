@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Eye, EyeOff } from "lucide-react";
@@ -32,15 +31,15 @@ export function PasswordModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
-        <h2 className="text-lg font-semibold text-gray-900">Edit Password</h2>
-        <p className="mt-1 text-sm text-gray-600">
+      <div className="w-full max-w-sm rounded-xl bg-card p-6 shadow-lg border border-border">
+        <h2 className="text-lg font-semibold text-card-foreground">Edit Password</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
           Update password for <span className="font-medium">{username}</span>
         </p>
 
         <div className="mt-4 space-y-3">
           <div>
-            <label htmlFor="pwd" className="text-sm font-medium text-gray-700 block mb-1">
+            <label htmlFor="pwd" className="text-sm font-medium text-foreground block mb-1">
               New Password
             </label>
             <div className="relative">
@@ -56,7 +55,7 @@ export function PasswordModal({
               <button
                 type="button"
                 onClick={onShowPasswordToggle}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 {showPassword ? (
                   <EyeOff className="w-4 h-4" />

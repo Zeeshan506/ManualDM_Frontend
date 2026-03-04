@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
@@ -71,7 +71,7 @@ export default function AdminUsersPage() {
     isSubmitting: false,
   });
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     if (!user?.accessToken) {
       setLoading(false);
       return;
@@ -97,7 +97,7 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.accessToken]);
 
   useEffect(() => {
     if (user?.role === "sales_rep") {
@@ -114,7 +114,7 @@ export default function AdminUsersPage() {
     return () => {
       cancelled = true;
     };
-  }, [user?.accessToken, user?.role, router]);
+  }, [fetchUsers, user?.role, router]);
 
   const handleOpenPasswordModal = (userId: number, username: string) => {
     setPasswordModal({
@@ -373,11 +373,11 @@ export default function AdminUsersPage() {
   };
 
   if (loading) {
-    return <div className="p-6 text-sm text-gray-500">Loading users...</div>;
+    return <div className="p-6 text-sm text-muted-foreground">Loading users...</div>;
   }
 
   if (error) {
-    return <div className="p-6 text-sm text-red-600">{error}</div>;
+    return <div className="p-6 text-sm text-destructive">{error}</div>;
   }
 
   if (user?.role === "sales_rep") {

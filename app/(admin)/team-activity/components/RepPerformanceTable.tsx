@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api-client";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
@@ -38,10 +39,14 @@ export function RepPerformanceTable() {
       }
 
       try {
-        const response = await fetch(`${API_URL}/api/sudo/team-activity/performance`, {
+        const response = await apiFetch(`${API_URL}/api/sudo/team-activity/performance`, {
           headers: {
             Authorization: `Bearer ${user.accessToken}`,
           },
+          timeoutMs: 10000,
+          minIntervalMs: 700,
+          retry: { retries: 1 },
+          throttleKey: "team-activity:performance",
         });
         if (!response.ok) {
           throw new Error("Failed to fetch team performance");

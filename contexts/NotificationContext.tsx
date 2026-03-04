@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api-client";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
@@ -94,10 +95,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     const loadRecent = async () => {
       try {
         console.info("[WS][notifications] loading recent history", { limit: RECENT_NOTIFICATION_LIMIT });
-        const response = await fetch(`${API_URL}/api/notifications?limit=${RECENT_NOTIFICATION_LIMIT}`, {
+        const response = await apiFetch(`${API_URL}/api/notifications?limit=${RECENT_NOTIFICATION_LIMIT}`, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
+          timeoutMs: 10000,
+          minIntervalMs: 500,
+          retry: { retries: 2 },
+          throttleKey: "notifications:recent",
         });
 
         if (!response.ok || isCancelled) {

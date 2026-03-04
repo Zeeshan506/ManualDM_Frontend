@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { Lead } from "./LeadDetailsForm";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiFetch } from "@/lib/api-client";
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
@@ -52,65 +53,75 @@ export function InboxColumn({
   activeId,
 }: InboxColumnProps) {
   const { user } = useAuth();
+  const accessToken = user?.accessToken;
 
   const [inboxItems, setInboxItems] = useState<InboxItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const fetchLeads = useCallback(async (silent = false) => {
+    try {
+      if (!silent) {
+        setIsLoading(true);
+      }
+      const url = `${API_URL}/api/leads`;
+
+      if (!accessToken) {
+        setInboxItems([]);
+        return;
+      }
+
+      const response = await apiFetch(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        timeoutMs: 10000,
+        minIntervalMs: 750,
+        retry: { retries: 1 },
+        throttleKey: "leads:inbox",
+      });
+      if (!response.ok) throw new Error("Failed to fetch leads");
+
+      const data = (await response.json()) as Array<InboxItem & Record<string, unknown>>;
+      setInboxItems(data.map(normalizeInboxItem));
+    } catch (error) {
+      console.error("Error fetching leads:", error);
+      setInboxItems([]);
+    } finally {
+      if (!silent) {
+        setIsLoading(false);
+      }
+    }
+  }, [accessToken]);
+
   useEffect(() => {
     let cancelled = false;
 
-    const fetchLeads = async (silent = false) => {
-      try {
-        if (!silent) {
-          setIsLoading(true);
-        }
-        const url = `${API_URL}/api/leads`;
-        const accessToken = user?.accessToken;
-
-        if (!accessToken) {
-          setInboxItems([]);
-          return;
-        }
-
-        const response = await fetch(url, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
-        if (!response.ok) throw new Error("Failed to fetch leads");
-
-        const data = (await response.json()) as Array<InboxItem & Record<string, unknown>>;
-        if (!cancelled) {
-          setInboxItems(data.map(normalizeInboxItem));
-        }
-      } catch (error) {
-        console.error("Error fetching leads:", error);
-        if (!cancelled) {
-          setInboxItems([]);
-        }
-      } finally {
-        if (!cancelled && !silent) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    if (!user) {
+    if (!accessToken) {
       setInboxItems([]);
       setIsLoading(false);
       return;
     }
 
-    fetchLeads();
+    const safeFetch = async (silent = false) => {
+      if (cancelled) {
+        return;
+      }
+      await fetchLeads(silent);
+    };
+
+    void safeFetch();
     const intervalId = window.setInterval(() => {
-      void fetchLeads(true);
+      if (typeof document !== "undefined" && document.hidden) {
+        return;
+      }
+      void safeFetch(true);
     }, 5000);
 
     return () => {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [user?.role, user?.userId, user?.accessToken]);
+  }, [accessToken, fetchLeads]);
 
   return (
     <div
